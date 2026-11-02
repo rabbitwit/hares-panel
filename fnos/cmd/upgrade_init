@@ -1,0 +1,1 @@
+#!/bin/bash`n# Called before upgrade. Data lives in the persistent app var directory.`nexit 0`n

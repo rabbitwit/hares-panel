@@ -1,0 +1,3 @@
+#!/bin/bash
+# Called after install. The image creates its data directory on first boot.
+exit 0

@@ -1,0 +1,15 @@
+appname=hares-panel
+version=0.1.0
+display_name=Hares-Panel
+desc=面向 NAS、家庭服务器和云主机的导航首页：内外网地址切换、图标库、壁纸、备份恢复，数据保存在应用数据目录内。
+source=thirdparty
+platform=x86
+maintainer=rabbitwit
+maintainer_url=https://github.com/rabbitwit/hares-panel
+distributor=rabbitwit
+distributor_url=https://github.com/rabbitwit/hares-panel
+desktop_uidir=ui
+desktop_applaunchname=hares-panel.Application
+service_port=18000
+checkport=true
+ctl_stop=true

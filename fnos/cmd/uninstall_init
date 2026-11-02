@@ -1,0 +1,1 @@
+#!/bin/bash`n# Called before uninstall. Data stays unless the user removes it.`nexit 0`n

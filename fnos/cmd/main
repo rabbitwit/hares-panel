@@ -1,0 +1,28 @@
+#!/bin/bash
+# Status probe for the Hares-Panel container started by appcenter.
+
+CONTAINER_NAME="hares-panel"
+
+is_running() {
+    docker inspect "$CONTAINER_NAME" 2>/dev/null | grep -q '"Status": "running"'
+}
+
+case "$1" in
+start)
+    # appcenter starts the docker project itself
+    exit 0
+    ;;
+stop)
+    # appcenter stops the docker project itself
+    exit 0
+    ;;
+status)
+    if is_running; then
+        exit 0
+    fi
+    exit 3
+    ;;
+*)
+    exit 1
+    ;;
+esac

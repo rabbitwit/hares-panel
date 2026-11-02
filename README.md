@@ -870,6 +870,21 @@ docker run -d --name hares-panel --restart unless-stopped \
 - 如果界面用的是「选择镜像 → 创建容器」而不是 Compose，那么端口来自镜像的 `EXPOSE 3000`，只能得到 `3000 → 3000`：Docker 镜像里没有“宿主机端口”这个字段，任何镜像都无法预填 `18000`。这种入口请手填一次本地端口 `18000`（容器端口保持 `3000`），或者改用 Compose 导入。
 - 平台支持 Compose 时优先用上面的「方式 B」：`docker-compose.yml` 已经包含 `18000:3000`、`/data` 挂载、重启策略和日志轮转，不用逐项手填。
 
+#### 方式 E：飞牛 fnOS 应用包（.fpk）
+
+仓库里附带了飞牛应用中心的安装包 [hares-panel.fpk](fnos/hares-panel.fpk)（源码与打包脚本在 [fnos/](fnos/README.md)）。在「应用中心 → 手动安装」里选中它安装，完成后从桌面图标打开：
+
+| 项 | 值 |
+| --- | --- |
+| 宿主机端口 | `18000`（来自 `manifest` 的 `service_port`） |
+| 容器端口 | `3000`（compose 里 `${TRIM_SERVICE_PORT}:3000`） |
+| 数据目录 | `${TRIM_PKGVAR}/data`，升级保留 |
+| 访问地址 | `http://<NAS IP>:18000` |
+
+> 只有通过应用中心安装这个包，才有「默认 18000:3000」的效果：端口默认值来自 `manifest`。直接「拉取镜像 → 运行」的创建容器表单只能读到镜像的 `EXPOSE 3000`，无法预填宿主机端口。
+
+重新打包需要 [fnpack](https://developer.fnnas.com/docs/cli/fnpack/)：在 `fnos/` 目录执行 `.\build.ps1 -Fnpack <fnpack.exe>`（Windows）或 `FNPACK=<fnpack> ./build.sh`（Linux/macOS），详见 [fnos/README.md](fnos/README.md)。
+
 #### 环境变量
 
 | 变量 | 默认值 | 说明 |
