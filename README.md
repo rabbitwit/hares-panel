@@ -1061,7 +1061,15 @@ npm ci
 
 **`wrangler deploy` 报找不到 D1 / R2？** 需要先把 `wrangler.jsonc` 中的 `<D1_DATABASE_ID>` 换成真实 ID，并创建对应的 R2 bucket；详见「部署」章节。`wrangler deploy --dry-run` 不会校验资源 ID。
 
-**忘记密码？** 修改部署平台的 `ADMIN_PASSWORD`：Cloudflare 使用 `wrangler secret put`，Vercel 在 Environment Variables 中修改，EdgeOne 在项目环境变量中修改；保存后重新部署 / 刷新即可，无需在页面中重置。Docker 可以修改 `.env` 后执行 `docker compose up -d`；如果是首次启动自动生成的密码，直接查看 `./data/admin-password` 或 `docker compose logs hares-panel`。
+**容器日志里的自动生成密码登不上？** 自动密码是 32 位 base64url 字符串，服务端不会 trim，多一个空格、少一个字符都会返回 401。旧版入口脚本生成的密码可能以 `-` 开头，日志里那一行还带前导空格，复制时最容易漏掉 `-`。取准确值：
+
+```bash
+docker exec <容器名> cat /data/admin-password
+```
+
+也可以直接设置 `ADMIN_PASSWORD` 环境变量覆盖它（设置后以环境变量为准）。新版镜像生成的首尾字符一定是字母或数字，并且密码单独一行输出，不再带前导空格。
+
+**忘记密码？** 修改部署平台的 `ADMIN_PASSWORD`：Cloudflare 使用 `wrangler secret put`，Vercel 在 Environment Variables 中修改，EdgeOne 在项目环境变量中修改；保存后重新部署 / 刷新即可，无需在页面中重置。Docker 可以修改 `.env` 后执行 `docker compose up -d`；如果是首次启动自动生成的密码，直接查看 `./data/admin-password` 或 `docker compose logs hares-panel`。彻底重置：删除 `/data/admin-password` 后重启容器，会重新生成并打印新密码。
 
 **Docker 通过外部反代访问异常？** 确认反向代理目标指向 `http://<NAS IP>:18000`，并转发 `Host`、`X-Forwarded-Proto`、`X-Forwarded-Host`。HTTPS 证书由外部 Nginx / Caddy 负责，容器内不申请证书；可查看对应反向代理的日志排查。
 

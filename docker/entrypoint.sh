@@ -10,17 +10,31 @@ export DATA_DIR APP_PORT
 mkdir -p "$DATA_DIR/assets"
 
 # Generate an admin password on first boot instead of shipping a default one.
+#
+# base64url without padding. The first and last characters are forced to be
+# alphanumeric so the password never looks like a CLI flag (a leading "-" is
+# easy to drop when copying from logs) and never ends with punctuation.
+generate_password() {
+  while :; do
+    candidate="$(head -c 24 /dev/urandom | base64 | tr -d '\n=' | tr '+/' '-_')"
+    case "$candidate" in
+      [A-Za-z0-9]*[A-Za-z0-9]) printf '%s\n' "$candidate"; return 0 ;;
+    esac
+  done
+}
+
 if [ -z "${ADMIN_PASSWORD:-}" ]; then
   if [ -s "$DATA_DIR/admin-password" ]; then
     ADMIN_PASSWORD="$(cat "$DATA_DIR/admin-password")"
     echo "[hares-panel] 使用已保存的管理员密码：$DATA_DIR/admin-password"
+    echo "[hares-panel] 忘记密码可执行：docker exec <容器名> cat $DATA_DIR/admin-password"
   else
-    ADMIN_PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -d '\n=' | tr '+/' '-_')"
+    ADMIN_PASSWORD="$(generate_password)"
     printf '%s\n' "$ADMIN_PASSWORD" > "$DATA_DIR/admin-password"
     chmod 600 "$DATA_DIR/admin-password" 2>/dev/null || true
     echo "============================================================"
-    echo " Hares-Panel 首次启动，已自动生成管理员密码："
-    echo " $ADMIN_PASSWORD"
+    echo " Hares-Panel 首次启动，已自动生成管理员密码（复制下面这一行，不要带空格）："
+    echo "$ADMIN_PASSWORD"
     echo " 密码同时保存在容器内 $DATA_DIR/admin-password"
     echo " 也可以通过设置 ADMIN_PASSWORD 环境变量覆盖。"
     echo "============================================================"
