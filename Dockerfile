@@ -1,5 +1,10 @@
+# Base image. Docker Hub is often slow or unreachable from mainland networks;
+# override it with a mirror when needed, e.g.
+#   docker build --build-arg NODE_IMAGE=docker.m.daocloud.io/library/node:24-alpine .
+ARG NODE_IMAGE=node:24-alpine
+
 # --- build ------------------------------------------------------------------
-FROM node:24-alpine AS build
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -9,7 +14,7 @@ COPY . .
 RUN npm run build:docker
 
 # --- runtime ----------------------------------------------------------------
-FROM node:24-alpine AS runtime
+FROM ${NODE_IMAGE} AS runtime
 
 # Optional Alpine mirror. Leave empty to try the mirrors below in order; set
 # e.g. --build-arg APK_MIRROR=https://dl-cdn.alpinelinux.org/alpine to pin one.

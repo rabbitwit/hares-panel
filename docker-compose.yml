@@ -4,6 +4,7 @@ services:
       context: .
       args:
         APK_MIRROR: ${APK_MIRROR:-}
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-alpine}
     image: hares-panel:latest
     container_name: hares-panel
     restart: unless-stopped

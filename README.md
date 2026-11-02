@@ -913,7 +913,7 @@ panel.example.com {
 - `./data` 包含密码和会话密钥；
 - 文件存储按单容器设计，不要让多个容器副本同时写同一个 `./data` 目录。
 
-#### 构建缓慢或 apk 超时
+#### 构建缓慢、拉取基础镜像失败或 apk 超时
 
 Dockerfile 默认依次尝试 `mirrors.aliyun.com`、`mirrors.tuna.tsinghua.edu.cn` 和 Alpine 官方源（每个最多 60 秒），国内网络通常无需手动处理。也可以显式指定镜像源，在 `.env` 中设置：
 
@@ -922,6 +922,21 @@ APK_MIRROR=https://mirrors.aliyun.com/alpine
 ```
 
 然后重新执行 `docker compose up -d --build`。Compose 会把该值作为构建参数传给 Dockerfile；设置后只使用该镜像源，不再自动回退。
+
+如果构建在第一步 `FROM node:24-alpine` 就失败，报 `failed to authorize`、`failed to fetch oauth token`、`EOF` 或 `连接被重置`，说明本机访问 Docker Hub 被阻断（与代码无关）。换一个能访问的基础镜像即可：
+
+```dotenv
+# .env
+NODE_IMAGE=docker.m.daocloud.io/library/node:24-alpine
+```
+
+```bash
+docker compose up -d --build
+# 或直接构建
+docker build --build-arg NODE_IMAGE=docker.m.daocloud.io/library/node:24-alpine -t hares-panel .
+```
+
+`NODE_IMAGE` 是 Dockerfile 里 `FROM ${NODE_IMAGE}` 的构建参数，默认 `node:24-alpine`；其他可用的 Docker Hub 镜像源同理，填完整镜像地址（含仓库路径）即可。
 
 ### 其他静态托管
 
