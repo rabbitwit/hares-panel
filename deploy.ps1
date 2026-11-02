@@ -1,4 +1,4 @@
-﻿param(
+param(
   [int]$Port = 0,
   [switch]$NoBuild
 )
@@ -52,7 +52,7 @@ function Set-EnvValue([string]$Key, [string]$Value) {
   Write-EnvLines $output
 }
 
-function Ensure-EnvValue([string]$Key, [string]$Value) {
+function Set-EnvDefault([string]$Key, [string]$Value) {
   if ([string]::IsNullOrWhiteSpace((Read-EnvValue $Key))) {
     Set-EnvValue $Key $Value
   }
@@ -110,9 +110,9 @@ if ([string]::IsNullOrWhiteSpace((Read-EnvValue "ADMIN_PASSWORD"))) {
   Write-Host "已为 .env 生成随机管理员密码。"
 }
 
-if ($AppPortArg) { Set-EnvValue "PANEL_PORT" "$AppPort" } else { Ensure-EnvValue "PANEL_PORT" "$AppPort" }
-Ensure-EnvValue "HARES_STATE_MAX_MB" "16"
-Ensure-EnvValue "HARES_ASSET_MAX_MB" "16"
+if ($AppPortArg) { Set-EnvValue "PANEL_PORT" "$AppPort" } else { Set-EnvDefault "PANEL_PORT" "$AppPort" }
+Set-EnvDefault "HARES_STATE_MAX_MB" "16"
+Set-EnvDefault "HARES_ASSET_MAX_MB" "16"
 
 $PanelPortValue = Read-EnvValue "PANEL_PORT"
 if (-not $PanelPortValue) { $PanelPortValue = "18000" }
