@@ -1,7 +1,7 @@
 # Hares-Panel for 飞牛 fnOS
 #
-# 宿主端口来自 manifest 的 service_port（默认 18000），容器内固定监听 3000，
-# 因此安装后的映射就是 18000:3000，和仓库 docker-compose.yml 保持一致。
+# 宿主端口来自 manifest 的 service_port（默认 18000），容器内同样监听 18000，
+# 因此安装后的映射就是 18000:18000，和仓库 docker-compose.yml 保持一致。
 services:
   hares-panel:
     image: harswit2265/hares-panel:latest
@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 20s
     ports:
-      - "${TRIM_SERVICE_PORT}:3000"
+      - "${TRIM_SERVICE_PORT}:18000"
     environment:
       HARES_RUNTIME: docker
       TZ: Asia/Shanghai

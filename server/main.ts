@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url'
 import { handleApi } from './core'
 import { createFileRuntime, type FileRuntime } from './file'
 
-const DEFAULT_PORT = 3000
+const DEFAULT_PORT = 18000
 const MAX_REQUEST_BYTES = 32 * 1024 * 1024
 
 const MIME_TYPES: Record<string, string> = {

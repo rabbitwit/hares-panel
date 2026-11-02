@@ -1,8 +1,8 @@
 # Hares-Panel · 飞牛 fnOS 应用包
 
-把 Hares-Panel 打包成飞牛应用中心可安装的 `.fpk`。安装后应用默认占用宿主机端口 **18000**，映射到容器 **3000**，与仓库根目录的 `docker-compose.yml` 一致。
+把 Hares-Panel 打包成飞牛应用中心可安装的 `.fpk`。安装后应用默认占用宿主机端口 **18000**，容器内同样监听 **18000**，与仓库根目录的 `docker-compose.yml` 一致。
 
-> 只有通过应用中心的「手动安装」入口安装这个 `.fpk`，才有默认 18000 的效果。直接「拉取镜像 → 运行」的创建容器表单只能读取镜像的 `EXPOSE 3000`，无法预填宿主机端口。
+> 直接「拉取镜像 → 运行」时，创建容器表单会读取镜像的 `EXPOSE 18000`，同样预填 `18000:18000`；应用包额外提供桌面入口、应用目录内的数据管理和升级管理。
 
 ## 目录
 
@@ -10,7 +10,7 @@
 fnos/
 ├── manifest                     # 应用元数据：service_port=18000
 ├── app/
-│   ├── docker/docker-compose.yaml   # ${TRIM_SERVICE_PORT}:3000
+│   ├── docker/docker-compose.yaml   # ${TRIM_SERVICE_PORT}:18000
 │   └── ui/config                    # 桌面入口，端口 18000
 ├── cmd/                         # 生命周期脚本（启动/停止/状态）
 ├── config/
@@ -26,7 +26,7 @@ fnos/
 | 位置 | 值 | 说明 |
 | --- | --- | --- |
 | `manifest` 的 `service_port` | `18000` | 宿主机端口默认值 |
-| compose `ports` | `${TRIM_SERVICE_PORT}:3000` | 宿主机 18000 → 容器 3000 |
+| compose `ports` | `${TRIM_SERVICE_PORT}:18000` | 宿主机 18000 → 容器 18000 |
 | compose `volumes` | `${TRIM_PKGVAR}/data:/data` | 数据持久化，升级保留 |
 | `app/ui/config` 的 `port` | `18000` | 桌面入口访问端口 |
 

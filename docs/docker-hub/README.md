@@ -25,7 +25,7 @@ Hares-Panel 是一个面向 NAS、家庭服务器和云主机的导航首页。�
 | 项目 | 说明 |
 | --- | --- |
 | 镜像 | `hareswit2265/hares-panel:latest` |
-| 容器端口 | `3000` |
+| 容器端口 | `18000` |
 | 默认宿主机端口 | `18000` |
 | 数据目录 | `/data` |
 | 健康检查 | `GET /api/health` |
@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 20s
     ports:
-      - "18000:3000"
+      - "18000:18000"
     environment:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SESSION_SECRET: ${SESSION_SECRET:-}
@@ -62,7 +62,7 @@ services:
     volumes:
       - ./data:/data
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.APP_PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.APP_PORT||18000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       start_period: 20s
@@ -137,7 +137,7 @@ cat ./data/admin-password
 docker run -d \
   --name hares-panel \
   --restart unless-stopped \
-  -p 18000:3000 \
+  -p 18000:18000 \
   -e ADMIN_PASSWORD='替换成你的强密码' \
   -e TZ=Asia/Shanghai \
   -v "$PWD/data:/data" \
@@ -284,11 +284,11 @@ curl http://127.0.0.1:18000/api/health
 
 **端口 18000 已被占用？**
 
-修改 `docker-compose.yml` 的 `ports` 行，换掉宿主机端口（容器端口保持 `3000`）：
+修改 `docker-compose.yml` 的 `ports` 行，换掉宿主机端口（容器端口保持 `18000`）：
 
 ```yaml
     ports:
-      - "19000:3000"
+      - "19000:18000"
 ```
 
 然后重新执行 `docker compose up -d`。

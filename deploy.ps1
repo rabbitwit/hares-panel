@@ -124,12 +124,12 @@ if ($PanelPortValue -notmatch '^\d+$' -or -not (Test-PortValue ([int]$PanelPortV
 Write-Host ""
 $composeFile = "docker-compose.yml"
 if ($PanelPortValue -ne "18000") {
-  # docker-compose.yml 里的 18000:3000 是给 NAS 面板预填用的字面默认值；
+  # docker-compose.yml 里的 18000:18000 是给 NAS 面板预填用的字面默认值；
   # 自定义端口时生成一份同目录的覆盖文件，避免改动主文件。
   $composeFile = ".compose.deploy.yml"
-  $replacement = '"' + $PanelPortValue + ':3000"'
+  $replacement = '"' + $PanelPortValue + ':18000"'
   $sourcePath = (Resolve-Path "docker-compose.yml").Path
-  $composeText = [System.IO.File]::ReadAllText($sourcePath).Replace('"18000:3000"', $replacement)
+  $composeText = [System.IO.File]::ReadAllText($sourcePath).Replace('"18000:18000"', $replacement)
   [System.IO.File]::WriteAllText((Join-Path (Get-Location) $composeFile), $composeText)
   if (-not $composeText.Contains($replacement)) {
     Write-Host "无法从 docker-compose.yml 生成端口覆盖文件，请手动修改 ports 行。" -ForegroundColor Red

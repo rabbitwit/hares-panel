@@ -61,17 +61,20 @@ COPY --from=build /app/dist /app/dist
 COPY docker/entrypoint.sh /usr/local/bin/ha-res-entrypoint
 RUN chmod +x /usr/local/bin/ha-res-entrypoint
 
+# The container listens on 18000 and exposes the same port, so Docker UIs that
+# prefill ports from EXPOSE (fnOS 飞牛, Synology DSM, Portainer, ...) suggest
+# 18000:18000.
 ENV NODE_ENV=production \
     HARES_RUNTIME=docker \
     HARES_DATA_DIR=/data \
     HARES_STATIC_DIR=/app/dist \
-    APP_PORT=3000 \
-    PORT=3000
+    APP_PORT=18000 \
+    PORT=18000
 
 VOLUME ["/data"]
-EXPOSE 3000
+EXPOSE 18000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.APP_PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.APP_PORT||18000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/ha-res-entrypoint"]

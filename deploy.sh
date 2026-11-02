@@ -143,11 +143,11 @@ fi
 echo
 COMPOSE_FILE="docker-compose.yml"
 if [ "$PANEL_PORT_VALUE" != "18000" ]; then
-  # docker-compose.yml 里的 18000:3000 是给 NAS 面板预填用的字面默认值；
+  # docker-compose.yml 里的 18000:18000 是给 NAS 面板预填用的字面默认值；
   # 自定义端口时生成一份同目录的覆盖文件，避免改动主文件。
   COMPOSE_FILE=".compose.deploy.yml"
-  sed "s|^      - \"18000:3000\"|      - \"$PANEL_PORT_VALUE:3000\"|" docker-compose.yml > "$COMPOSE_FILE"
-  if ! grep -q "\"$PANEL_PORT_VALUE:3000\"" "$COMPOSE_FILE"; then
+  sed "s|^      - \"18000:18000\"|      - \"$PANEL_PORT_VALUE:18000\"|" docker-compose.yml > "$COMPOSE_FILE"
+  if ! grep -q "\"$PANEL_PORT_VALUE:18000\"" "$COMPOSE_FILE"; then
     echo "无法从 docker-compose.yml 生成端口覆盖文件，请手动修改 ports 行。" >&2
     rm -f "$COMPOSE_FILE"
     exit 1

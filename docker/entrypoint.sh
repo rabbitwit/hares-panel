@@ -4,7 +4,7 @@
 set -eu
 
 DATA_DIR="${HARES_DATA_DIR:-/data}"
-APP_PORT="${APP_PORT:-3000}"
+APP_PORT="${APP_PORT:-18000}"
 export DATA_DIR APP_PORT
 
 mkdir -p "$DATA_DIR/assets"
