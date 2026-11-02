@@ -141,11 +141,24 @@ if ! validate_port "$PANEL_PORT_VALUE"; then
 fi
 
 echo
-echo "> docker compose -f docker-compose.yml up -d"
+COMPOSE_FILE="docker-compose.yml"
+if [ "$PANEL_PORT_VALUE" != "18000" ]; then
+  # docker-compose.yml 里的 18000:3000 是给 NAS 面板预填用的字面默认值；
+  # 自定义端口时生成一份同目录的覆盖文件，避免改动主文件。
+  COMPOSE_FILE=".compose.deploy.yml"
+  sed "s|^      - \"18000:3000\"|      - \"$PANEL_PORT_VALUE:3000\"|" docker-compose.yml > "$COMPOSE_FILE"
+  if ! grep -q "\"$PANEL_PORT_VALUE:3000\"" "$COMPOSE_FILE"; then
+    echo "无法从 docker-compose.yml 生成端口覆盖文件，请手动修改 ports 行。" >&2
+    rm -f "$COMPOSE_FILE"
+    exit 1
+  fi
+fi
+
+echo "> docker compose -f $COMPOSE_FILE up -d"
 if [ "$NO_BUILD" = 1 ]; then
-  docker compose -f docker-compose.yml up -d
+  docker compose -f "$COMPOSE_FILE" up -d
 else
-  docker compose -f docker-compose.yml up -d --build
+  docker compose -f "$COMPOSE_FILE" up -d --build
 fi
 
 echo
@@ -178,7 +191,7 @@ if [ "$STATUS" = "healthy" ]; then
   echo " Hares-Panel 已启动（健康检查通过）"
 else
   echo " Hares-Panel 容器状态：$STATUS"
-  echo " 如未就绪，请查看：docker compose -f docker-compose.yml logs -f hares-panel"
+  echo " 如未就绪，请查看：docker compose -f $COMPOSE_FILE logs -f hares-panel"
 fi
 echo " 访问地址：http://<服务器IP>:$PANEL_PORT_VALUE"
 if [ -n "$ADMIN_PASSWORD" ]; then

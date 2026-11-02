@@ -51,7 +51,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 20s
     ports:
-      - "${PANEL_PORT:-18000}:3000"
+      - "18000:3000"
     environment:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SESSION_SECRET: ${SESSION_SECRET:-}
@@ -85,9 +85,6 @@ ADMIN_PASSWORD=
 
 # 可选：登录令牌签名密钥。留空时自动生成并保存到 ./data/session-secret
 SESSION_SECRET=
-
-# 宿主机端口。默认 18000，不占用 80/443
-PANEL_PORT=18000
 
 # 导航数据 / 单张图片大小上限（MB）
 HARES_STATE_MAX_MB=16
@@ -158,7 +155,7 @@ docker logs -f hares-panel
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `HARES_IMAGE` | 示例占位符 | Compose 使用的镜像名，改成实际 Docker Hub 镜像即可。 |
-| `PANEL_PORT` | `18000` | 宿主机端口，映射到容器 `3000`。 |
+| `PANEL_PORT` | `18000` | 宿主机端口；用 Compose 时改 `docker-compose.yml` 的 `ports` 行即可 |
 | `ADMIN_PASSWORD` | 首次启动自动生成 | 管理员登录密码。留空时生成随机密码并保存到 `/data/admin-password`。 |
 | `SESSION_SECRET` | 自动生成 | HMAC 登录令牌签名密钥。留空时保存到 `/data/session-secret`。 |
 | `HARES_STATE_MAX_MB` | `16` | 导航数据 JSON 的大小上限（MB）。 |
@@ -287,10 +284,11 @@ curl http://127.0.0.1:18000/api/health
 
 **端口 18000 已被占用？**
 
-修改 `.env`：
+修改 `docker-compose.yml` 的 `ports` 行，换掉宿主机端口（容器端口保持 `3000`）：
 
-```dotenv
-PANEL_PORT=19000
+```yaml
+    ports:
+      - "19000:3000"
 ```
 
 然后重新执行 `docker compose up -d`。

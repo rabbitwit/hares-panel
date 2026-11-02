@@ -8,11 +8,11 @@ services:
     container_name: hares-panel
     restart: unless-stopped
     stop_grace_period: 20s
-    # Only the app port is published, on a high port that is unlikely to
-    # collide with other NAS containers. Use your existing Nginx / Caddy /
-    # router for public access or TLS termination.
+    # 默认映射写死成 18000:3000，NAS 面板（飞牛 / 群晖等）解析本文件时会直接
+    # 预填这两个值；容器内固定监听 3000。要换宿主机端口，改这一行即可
+    # （用 deploy.sh / deploy.ps1 时可用 --port / -Port，脚本会生成覆盖文件）。
     ports:
-      - "${PANEL_PORT:-18000}:3000"
+      - "18000:3000"
     environment:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SESSION_SECRET: ${SESSION_SECRET:-}

@@ -20,3 +20,4 @@ docs
 tests
 cloud-functions
 *.log
+.compose.deploy.yml

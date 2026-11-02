@@ -763,7 +763,7 @@ Sun-Panel 导入规则：
 > 需要从 Docker Hub 拉取镜像部署时，可参考 [Docker Hub 部署说明](docs/docker-hub/README.md) 和 [docker-compose.yml](docs/docker-hub/docker-compose.yml)。
 
 - **Node 24 服务端**：提供 SPA 与 `/api/*`，状态和图片写入 `/data`；
-- **面板直连端口**：宿主机默认 `18000`，映射到容器 `3000`，不占用 80/443；
+- **面板直连端口**：宿主机 `18000`，映射到容器 `3000`，不占用 80/443；
 - **首次启动自动生成管理员密码**：未设置 `ADMIN_PASSWORD` 时写入 `/data/admin-password`，并打印到容器日志；
 - **公网 HTTPS**：请使用 NAS 上已有的 Nginx / Caddy / 路由器反向代理到 `http://<NAS IP>:18000`。本项目不管理宿主机反代，也不处理证书。
 
@@ -773,7 +773,7 @@ Sun-Panel 导入规则：
 | --- | --- | --- | --- |
 | 面板 HTTP | `18000` | `3000` | 默认只发布这一个端口 |
 
-端口可通过 `.env` 的 `PANEL_PORT` 或部署脚本的 `--port` / `-Port` 修改。默认使用高位端口，避免和 NAS 上已有的 应用 / 其他容器冲突。
+`docker-compose.yml` 里写的是字面值 `"18000:3000"`，NAS 面板解析该文件时会直接预填这两个端口。要换宿主机端口：用 `deploy.sh` / `deploy.ps1` 的 `--port` / `-Port`（脚本会读取 `.env` 的 `PANEL_PORT` 并生成端口覆盖文件），或手动改 `docker-compose.yml` 的 `ports` 行。默认使用高位端口，避免和 NAS 上已有的应用 / 其他容器冲突。
 
 #### 宿主机 `./data` 目录结构
 
@@ -851,13 +851,32 @@ docker run -d --name hares-panel --restart unless-stopped \
   hares-panel
 ```
 
+#### 方式 D：NAS 应用向导（飞牛 / 群晖）
+
+飞牛（fnOS）、群晖（DSM）的 Docker 界面支持直接导入 `docker-compose.yml`。本仓库的 compose 里把端口写成了字面值 **`18000:3000`**（不是 `${PANEL_PORT:-18000}` 变量），所以导入或创建工作项目时，界面会直接预填成：
+
+| 向导里的字段 | 值 | 说明 |
+| --- | --- | --- |
+| 本地端口（宿主机） | `18000` | 可改成其他空闲高位端口 |
+| 容器端口 | `3000` | 容器内固定监听 3000，不要改 |
+| 协议 | `TCP` | |
+| 存储 / 卷 | `/data` → NAS 上的目录 | 例如 `/vol1/1000/docker/hares-panel/data` |
+
+创建后访问 `http://<NAS IP>:18000`。
+
+注意事项：
+
+- 必须把 `/data` 挂到 NAS 上的持久目录：导航数据、上传图片、会话密钥、自动生成的密码都在这个目录，不挂载时重建容器会全部丢失。
+- 如果界面用的是「选择镜像 → 创建容器」而不是 Compose，那么端口来自镜像的 `EXPOSE 3000`，只能得到 `3000 → 3000`：Docker 镜像里没有“宿主机端口”这个字段，任何镜像都无法预填 `18000`。这种入口请手填一次本地端口 `18000`（容器端口保持 `3000`），或者改用 Compose 导入。
+- 平台支持 Compose 时优先用上面的「方式 B」：`docker-compose.yml` 已经包含 `18000:3000`、`/data` 挂载、重启策略和日志轮转，不用逐项手填。
+
 #### 环境变量
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `ADMIN_PASSWORD` | 首次启动自动生成 | 管理员密码；留空时生成并保存到 `/data/admin-password` |
 | `SESSION_SECRET` | 自动生成 | HMAC 令牌密钥；留空时保存到 `/data/session-secret` |
-| `PANEL_PORT` | `18000` | 面板宿主机端口 |
+| `PANEL_PORT` | `18000` | 部署脚本使用的宿主机端口；手动跑 Compose 时请改 `docker-compose.yml` 的 `ports` 行 |
 | `HARES_STATE_MAX_MB` | `16` | 导航数据大小上限（MB） |
 | `HARES_ASSET_MAX_MB` | `16` | 单张图片大小上限（MB） |
 | `TZ` | `Asia/Shanghai` | 容器时区 |
@@ -981,7 +1000,7 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 
 ## 常见问题
 
-**页面显示「服务端尚未就绪」？** 检查 `/api/health` 是否返回 JSON 且 `ok: true`；确认已配置 KV/D1、Upstash Redis、EdgeOne Blob 或 Docker 的 `./data` 目录，并在对应平台设置了 `ADMIN_PASSWORD`（Docker 可留空自动生成）。Docker 还需确认 `PANEL_PORT`（默认 `18000`）已映射。
+**页面显示「服务端尚未就绪」？** 检查 `/api/health` 是否返回 JSON 且 `ok: true`；确认已配置 KV/D1、Upstash Redis、EdgeOne Blob 或 Docker 的 `./data` 目录，并在对应平台设置了 `ADMIN_PASSWORD`（Docker 可留空自动生成）。Docker 还需确认宿主机 `18000` 已映射到容器 `3000`。
 
 **页面显示「站点尚未初始化」？** 服务端可用但没有数据。点击登录，输入 `ADMIN_PASSWORD`，登录后会把内置示例写入服务端。
 
@@ -1015,6 +1034,8 @@ npm ci
 **忘记密码？** 修改部署平台的 `ADMIN_PASSWORD`：Cloudflare 使用 `wrangler secret put`，Vercel 在 Environment Variables 中修改，EdgeOne 在项目环境变量中修改；保存后重新部署 / 刷新即可，无需在页面中重置。Docker 可以修改 `.env` 后执行 `docker compose up -d`；如果是首次启动自动生成的密码，直接查看 `./data/admin-password` 或 `docker compose logs hares-panel`。
 
 **Docker 通过外部反代访问异常？** 确认反向代理目标指向 `http://<NAS IP>:18000`，并转发 `Host`、`X-Forwarded-Proto`、`X-Forwarded-Host`。HTTPS 证书由外部 Nginx / Caddy 负责，容器内不申请证书；可查看对应反向代理的日志排查。
+
+**飞牛 / 群晖的 Docker 向导里端口显示多少？** 导入仓库里的 `docker-compose.yml` 时显示 `18000:3000`（端口是字面值，不依赖变量展开），挂载 `/data` 后直接创建即可。如果是「选镜像 → 创建容器」的入口，端口来自镜像的 `EXPOSE 3000`，只能显示 `3000 → 3000`（镜像里没有宿主机端口字段），请手填本地端口 `18000`、容器端口保持 `3000`。
 
 **FlatNas / Sun-Panel 导入后图标空白？** 这两个面板的备份只保存本地上传图标的路径（例如 FlatNas 的 `/icon-cache/...`、Sun-Panel 的 `/upload/...`），不包含图片本体，因此无法直接迁移；导入时这些图标会留空并给出提示，重新选择图标或填写图片 URL 即可。FlatNas 的嵌套 bookmark 分类会展开为 `父分类 / 子分类` 分组。
 

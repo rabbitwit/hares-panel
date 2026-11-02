@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 20s
     ports:
-      - "${PANEL_PORT:-18000}:3000"
+      - "18000:3000"
     environment:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       SESSION_SECRET: ${SESSION_SECRET:-}

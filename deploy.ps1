@@ -122,10 +122,26 @@ if ($PanelPortValue -notmatch '^\d+$' -or -not (Test-PortValue ([int]$PanelPortV
 }
 
 Write-Host ""
-Write-Host "> docker compose -f docker-compose.yml up -d"
+$composeFile = "docker-compose.yml"
+if ($PanelPortValue -ne "18000") {
+  # docker-compose.yml 里的 18000:3000 是给 NAS 面板预填用的字面默认值；
+  # 自定义端口时生成一份同目录的覆盖文件，避免改动主文件。
+  $composeFile = ".compose.deploy.yml"
+  $replacement = '"' + $PanelPortValue + ':3000"'
+  $sourcePath = (Resolve-Path "docker-compose.yml").Path
+  $composeText = [System.IO.File]::ReadAllText($sourcePath).Replace('"18000:3000"', $replacement)
+  [System.IO.File]::WriteAllText((Join-Path (Get-Location) $composeFile), $composeText)
+  if (-not $composeText.Contains($replacement)) {
+    Write-Host "无法从 docker-compose.yml 生成端口覆盖文件，请手动修改 ports 行。" -ForegroundColor Red
+    Remove-Item -LiteralPath $composeFile -ErrorAction SilentlyContinue
+    exit 1
+  }
+}
+
+Write-Host "> docker compose -f $composeFile up -d"
 $composeArgs = @("up", "-d")
 if (-not $NoBuild) { $composeArgs += "--build" }
-& docker compose -f docker-compose.yml @composeArgs 2>&1 | ForEach-Object { Write-Host $_ }
+& docker compose -f $composeFile @composeArgs 2>&1 | ForEach-Object { Write-Host $_ }
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host ""
@@ -150,7 +166,7 @@ if ($status -eq "healthy") {
   Write-Host " Hares-Panel 已启动（健康检查通过）"
 } else {
   Write-Host " Hares-Panel 容器状态：$status"
-  Write-Host " 如未就绪，请查看：docker compose -f docker-compose.yml logs -f hares-panel"
+  Write-Host " 如未就绪，请查看：docker compose -f $composeFile logs -f hares-panel"
 }
 Write-Host " 访问地址：http://localhost:$PanelPortValue"
 if ($adminPassword) { Write-Host " 管理员密码：$adminPassword" }

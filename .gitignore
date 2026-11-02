@@ -28,3 +28,4 @@ src-tauri/gen
 skills-lock.json
 .nvmrc
 !.env.example
+.compose.deploy.yml
