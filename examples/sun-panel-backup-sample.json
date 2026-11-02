@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "appName": "Sun-Panel-Config",
+  "exportTime": "2026-11-01 19:00:00",
+  "appVersion": "1.8.1",
+  "md5": "b9c80570bea8b5745ba8868e279ea45e",
+  "icons": [
+    {
+      "title": "常用工具",
+      "sort": 1,
+      "children": [
+        {
+          "icon": {
+            "itemType": 2,
+            "src": "https://www.google.com/favicon.ico",
+            "text": "",
+            "backgroundColor": ""
+          },
+          "sort": 1,
+          "title": "Google",
+          "url": "https://www.google.com/",
+          "lanUrl": "",
+          "description": "全球最大的搜索引擎",
+          "openMethod": 2,
+          "cardType": 1,
+          "backgroundColor": "#2a2a2a6b",
+          "expandParam": {}
+        },
+        {
+          "icon": {
+            "itemType": 2,
+            "src": "https://github.githubassets.com/favicons/favicon.svg",
+            "text": "",
+            "backgroundColor": ""
+          },
+          "sort": 2,
+          "title": "GitHub",
+          "url": "https://github.com/",
+          "lanUrl": "",
+          "description": "代码托管与协作平台",
+          "openMethod": 2,
+          "cardType": 1,
+          "backgroundColor": "#2a2a2a6b",
+          "expandParam": {}
+        }
+      ],
+      "cardStyle": {
+        "style": 0,
+        "textColor": "#ffffff",
+        "textInfoHideDescription": false,
+        "textIconHideTitle": false
+      }
+    },
+    {
+      "title": "AI 效率中心",
+      "sort": 2,
+      "children": [
+        {
+          "icon": {
+            "itemType": 2,
+            "src": "https://chatgpt.com/favicon.ico",
+            "text": "",
+            "backgroundColor": ""
+          },
+          "sort": 1,
+          "title": "ChatGPT",
+          "url": "https://chatgpt.com/",
+          "lanUrl": "",
+          "description": "OpenAI 对话助手",
+          "openMethod": 2,
+          "cardType": 1,
+          "backgroundColor": "#2a2a2a6b",
+          "expandParam": {}
+        },
+        {
+          "icon": {
+            "itemType": 2,
+            "src": "https://claude.ai/favicon.ico",
+            "text": "",
+            "backgroundColor": ""
+          },
+          "sort": 2,
+          "title": "Claude",
+          "url": "https://claude.ai/",
+          "lanUrl": "",
+          "description": "Anthropic AI 助手",
+          "openMethod": 2,
+          "cardType": 1,
+          "backgroundColor": "#2a2a2a6b",
+          "expandParam": {}
+        }
+      ],
+      "cardStyle": {
+        "style": 0,
+        "textColor": "#ffffff",
+        "textInfoHideDescription": false,
+        "textIconHideTitle": false
+      }
+    },
+    {
+      "title": "内网与软路由",
+      "sort": 3,
+      "children": [
+        {
+          "icon": {
+            "itemType": 2,
+            "src": "https://www.openwrt.org/favicon.ico",
+            "text": "",
+            "backgroundColor": ""
+          },
+          "sort": 1,
+          "title": "OpenWrt 路由",
+          "url": "http://192.168.1.1",
+          "lanUrl": "http://192.168.1.1",
+          "description": "主路由管理后台",
+          "openMethod": 2,
+          "cardType": 1,
+          "backgroundColor": "#2a2a2a6b",
+          "expandParam": {}
+        },
+        {
+          "icon": {
+            "itemType": 2,
+            "src": "https://www.qbittorrent.org/favicon.ico",
+            "text": "",
+            "backgroundColor": ""
+          },
+          "sort": 2,
+          "title": "qBittorrent",
+          "url": "http://192.168.1.100:8080",
+          "lanUrl": "http://192.168.1.100:8080",
+          "description": "下载管理器",
+          "openMethod": 2,
+          "cardType": 1,
+          "backgroundColor": "#2a2a2a6b",
+          "expandParam": {}
+        }
+      ],
+      "cardStyle": {
+        "style": 0,
+        "textColor": "#ffffff",
+        "textInfoHideDescription": false,
+        "textIconHideTitle": false
+      }
+    }
+  ]
+}

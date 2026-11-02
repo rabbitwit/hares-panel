@@ -1,0 +1,176 @@
+{
+  "appConfig": {
+    "customTitle": "我的 FlatNas 导航",
+    "background": "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80",
+    "wallpaperConfig": {
+      "enabled": true,
+      "type": "api",
+      "url": "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=80"
+    }
+  },
+  "version": 3,
+  "exportedAt": "2026-10-31T00:00:00.000Z",
+  "groups": [
+    {
+      "id": "group-common",
+      "title": "常用",
+      "isPublic": true,
+      "items": [
+        {
+          "id": "item-github",
+          "title": "GitHub",
+          "url": "https://github.com/",
+          "lanUrl": "http://192.168.1.10:3000/",
+          "icon": "https://cdn.simpleicons.org/github/181717",
+          "description1": "代码托管",
+          "description2": "开源项目",
+          "color": "bg-gray-50 text-gray-700",
+          "isPublic": true,
+          "createdAt": 1730000000000
+        },
+        {
+          "id": "item-nas",
+          "title": "NAS 管理",
+          "url": "",
+          "lanUrl": "http://192.168.1.10:5000/",
+          "backupUrls": [
+            {
+              "name": "备用外网",
+              "url": "https://nas.example.com/"
+            }
+          ],
+          "icon": "icons/nas.png",
+          "description1": "群晖 DSM",
+          "isPublic": true
+        },
+        {
+          "id": "item-immich",
+          "title": "Immich 相册",
+          "url": "https://photos.example.com/",
+          "lanUrl": "http://192.168.1.10:2283/",
+          "icon": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='64'%20height='64'%3E%3Crect%20width='64'%20height='64'%20rx='12'%20fill='%234f46e5'/%3E%3Ctext%20x='32'%20y='42'%20font-size='28'%20text-anchor='middle'%20fill='white'%3E%E5%AE%B6%3C/text%3E%3C/svg%3E",
+          "description1": "家庭相册",
+          "description2": "自动备份手机照片",
+          "isPublic": true
+        }
+      ]
+    },
+    {
+      "id": "group-work",
+      "title": "工作",
+      "isPublic": true,
+      "items": [
+        {
+          "id": "item-gitlab",
+          "title": "GitLab",
+          "url": "https://gitlab.example.com/",
+          "icon": "https://cdn.simpleicons.org/gitlab/fc6d26",
+          "description1": "内部代码仓库",
+          "isPublic": true
+        },
+        {
+          "id": "item-wiki",
+          "title": "团队 Wiki",
+          "url": "https://wiki.example.com/",
+          "icon": "lucide:book-open",
+          "description1": "文档与规范",
+          "isPublic": true
+        }
+      ]
+    },
+    {
+      "id": "group-media",
+      "title": "影音",
+      "isPublic": false,
+      "items": [
+        {
+          "id": "item-jellyfin",
+          "title": "Jellyfin",
+          "url": "https://media.example.com/",
+          "lanUrl": "http://192.168.1.10:8096/",
+          "icon": "https://cdn.simpleicons.org/jellyfin/00A4DC",
+          "description1": "家庭影院",
+          "isPublic": true
+        },
+        {
+          "id": "item-aria2",
+          "title": "Aria2 下载器",
+          "url": "http://192.168.1.10:6800/",
+          "icon": "https://cdn.simpleicons.org/aria2/009688",
+          "description1": "离线下载",
+          "isPublic": false
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "item-github",
+      "title": "GitHub",
+      "url": "https://github.com/"
+    },
+    {
+      "id": "item-nas",
+      "title": "NAS 管理",
+      "url": ""
+    },
+    {
+      "id": "item-immich",
+      "title": "Immich 相册",
+      "url": "https://photos.example.com/"
+    },
+    {
+      "id": "item-gitlab",
+      "title": "GitLab",
+      "url": "https://gitlab.example.com/"
+    },
+    {
+      "id": "item-wiki",
+      "title": "团队 Wiki",
+      "url": "https://wiki.example.com/"
+    },
+    {
+      "id": "item-jellyfin",
+      "title": "Jellyfin",
+      "url": "https://media.example.com/"
+    },
+    {
+      "id": "item-aria2",
+      "title": "Aria2 下载器",
+      "url": "http://192.168.1.10:6800/"
+    },
+    {
+      "id": "item-extra",
+      "title": "独立卡片",
+      "url": "https://standalone.example.com/",
+      "icon": "https://cdn.simpleicons.org/linktree/43E55E",
+      "description1": "不在任何分组中的顶层卡片",
+      "isPublic": true
+    }
+  ],
+  "widgets": [
+    {
+      "id": "widget-clock",
+      "type": "clock",
+      "enable": true,
+      "isPublic": true,
+      "data": {}
+    },
+    {
+      "id": "widget-weather",
+      "type": "weather",
+      "enable": true,
+      "isPublic": true,
+      "data": {}
+    },
+    {
+      "id": "widget-bookmark",
+      "type": "bookmark",
+      "enable": true,
+      "isPublic": true,
+      "data": []
+    }
+  ],
+  "rssFeeds": [],
+  "rssCategories": []
+}

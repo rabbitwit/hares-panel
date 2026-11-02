@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hares-panel",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-10-01",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  // 可选：启用云端同步时，取消注释并填入真实 ID。
+  // 元数据存储二选一（同时配置时优先使用 D1）：
+  // "kv_namespaces": [{ "binding": "hares_panel_kv", "id": "<KV_NAMESPACE_ID>" }],
+  // "d1_databases": [
+  //   {
+  //     "binding": "hares_panel",
+  //     "database_name": "hares-panel",
+  //     "database_id": "<D1_DATABASE_ID>"
+  //   }
+  // ],
+  // "r2_buckets": [
+  //   {
+  //     "bucket_name": "hares-panel-assets",
+  //     "binding": "hares_panel_assets"
+  //   }
+  // ]
+  // 管理员密码不要写在这里，请使用 `npx wrangler secret put ADMIN_PASSWORD`。
+}
