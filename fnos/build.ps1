@@ -18,6 +18,8 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Push-Location $root
 try {
   New-Item -ItemType Directory -Force -Path "wizard" | Out-Null
+  & node ../scripts/sync-fnos-version.mjs
+  if ($LASTEXITCODE -ne 0) { throw "version sync failed with exit code $LASTEXITCODE" }
   & $Fnpack build
   if ($LASTEXITCODE -ne 0) { throw "fnpack build failed with exit code $LASTEXITCODE" }
   $fpk = Join-Path $root "hares-panel.fpk"

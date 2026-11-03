@@ -56,4 +56,4 @@ FNPACK=/path/to/fnpack ./build.sh
 
 ## 升级
 
-修改 `manifest` 的 `version` 后重新打包安装即可；`${TRIM_PKGVAR}/data` 不会被清空。
+修改项目根目录 `package.json` 的 `version` 后重新打包安装即可（`build.sh` / `build.ps1` 会自动同步到 `manifest`）；`${TRIM_PKGVAR}/data` 不会被清空。

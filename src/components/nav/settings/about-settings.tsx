@@ -17,6 +17,7 @@ import { PanelHeader, SettingsSection } from './settings-ui'
 import { useCloudStore } from '@/store/cloud-store'
 import { cloudAssetLabel, cloudStorageLabel } from '@/lib/cloud'
 import { describeClientRuntime, describeDeployment } from '@/lib/runtime'
+import { APP_VERSION_LABEL } from '@/lib/version'
 
 const stack = [
   'React 18',
@@ -75,7 +76,7 @@ export function AboutSettingsPanel() {
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-display text-2xl font-bold tracking-tight">Hares-Panel</h3>
               <Badge variant="outline" className="text-[9px]">
-                v0.1.0
+                {APP_VERSION_LABEL}
               </Badge>
               <Badge className="bg-emerald-500/15 text-[9px] text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-300">
                 服务端模式

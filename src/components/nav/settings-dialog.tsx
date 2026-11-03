@@ -34,6 +34,7 @@ import { useSessionStore } from '@/store/session-store'
 import { useUiStore, type SettingsTab } from '@/store/ui-store'
 import { UserAvatar } from '@/components/nav/user-avatar'
 import { cn } from '@/lib/utils'
+import { APP_VERSION_LABEL } from '@/lib/version'
 
 const tabs: Array<{
   id: SettingsTab
@@ -213,7 +214,7 @@ export function SettingsDialog() {
                   公开访问读取服务端数据，账号信息不会公开
                 </span>
                 <Badge variant="outline" className="h-5 text-[9px] font-normal">
-                  v0.1.0
+                  {APP_VERSION_LABEL}
                 </Badge>
               </div>
             </div>

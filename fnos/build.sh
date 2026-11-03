@@ -9,5 +9,6 @@ cd "$(dirname "$0")"
 FNPACK="${FNPACK:-fnpack}"
 mkdir -p wizard
 
+node ../scripts/sync-fnos-version.mjs
 "$FNPACK" build
 echo "built: $(pwd)/hares-panel.fpk"

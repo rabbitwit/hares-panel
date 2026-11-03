@@ -1,5 +1,6 @@
 [package]
 name = "hares-nav"
+# App/bundle version is read from ../package.json via tauri.conf.json.
 version = "0.1.0"
 description = "Hares-Panel — 本地优先的导航首页"
 authors = ["Hares-Panel"]

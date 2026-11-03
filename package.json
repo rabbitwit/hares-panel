@@ -1,7 +1,7 @@
 {
   "name": "hares-panel",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "A Sun-Panel style navigation homepage backed by Cloudflare Workers, Vercel or EdgeOne Makers, with server-side storage.",
   "scripts": {
