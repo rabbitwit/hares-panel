@@ -1,11 +1,18 @@
+import { useEffect } from 'react'
 import {
+  AlertCircle,
+  ArrowUpRight,
+  CheckCircle2,
   Cloud,
   Code2,
   Database,
+  Download,
   ExternalLink,
   Github,
   Heart,
   Laptop,
+  Loader2,
+  RefreshCw,
   Rocket,
   ShieldAlert,
   Sparkles,
@@ -15,9 +22,17 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PanelHeader, SettingsSection } from './settings-ui'
 import { useCloudStore } from '@/store/cloud-store'
+import { useUpdateStore } from '@/store/update-store'
 import { cloudAssetLabel, cloudStorageLabel } from '@/lib/cloud'
 import { describeClientRuntime, describeDeployment } from '@/lib/runtime'
+import { cn } from '@/lib/utils'
 import { APP_VERSION_LABEL } from '@/lib/version'
+import {
+  UPDATE_DOCKER_HUB_URL,
+  UPDATE_GUIDE_URL,
+  UPDATE_REPOSITORY_URL,
+  updateSourceLabel,
+} from '@/lib/update'
 
 const stack = [
   'React 18',
@@ -46,15 +61,72 @@ const features = [
   '页内搜索、分组与卡片拖拽排序',
 ]
 
+function formatCheckedAt(value: number) {
+  if (!value) return ''
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value))
+}
+
 export function AboutSettingsPanel() {
   const runtime = describeClientRuntime()
   const browser = typeof navigator !== 'undefined' ? navigator.userAgent : ''
   const cloudInfo = useCloudStore((state) => state.info)
+  const updateStatus = useUpdateStore((state) => state.status)
+  const updateInfo = useUpdateStore((state) => state.info)
+  const updateError = useUpdateStore((state) => state.error)
+  const checkUpdate = useUpdateStore((state) => state.check)
   const deployment = describeDeployment(cloudInfo)
   const storageName = cloudStorageLabel(cloudInfo?.storage)
   const assetName = cloudInfo?.assets ? cloudAssetLabel(cloudInfo.assets) : ''
   const storageLabel =
     assetName && assetName !== storageName ? `${storageName} + ${assetName}` : storageName
+
+  const checking = updateStatus === 'checking'
+  const updateAvailable = Boolean(updateInfo?.updateAvailable)
+  const updateErrorText = (updateError || '检查更新失败').replace(/[。.!！]+$/, '')
+  const updateTitle = checking
+    ? '正在检查更新…'
+    : updateStatus === 'error'
+      ? '暂时无法检查更新'
+      : updateStatus === 'idle'
+        ? '尚未检查更新'
+        : updateAvailable
+          ? `发现新版本 v${updateInfo?.latestVersion}`
+          : '当前已是最新版本'
+  const updateDescription = checking
+    ? '正在从 Docker Hub 和 GitHub 获取最新版本信息。'
+    : updateStatus === 'error'
+      ? `${updateErrorText}。请确认服务器可以访问 Docker Hub / GitHub，或稍后重试。`
+      : updateStatus === 'idle'
+        ? '打开此页时会自动检查（结果缓存约 12 小时），也可以点击右上角立即检查。'
+        : updateAvailable
+          ? `当前版本 ${APP_VERSION_LABEL}。升级镜像或应用不会影响导航数据和图片。`
+          : `当前版本 ${APP_VERSION_LABEL} 已是已发布的最高版本。`
+  const updateTone =
+    checking || updateStatus === 'idle'
+      ? 'border-sky-500/20 bg-sky-500/5'
+      : updateStatus === 'error'
+        ? 'border-amber-500/20 bg-amber-500/5'
+        : updateAvailable
+          ? 'border-sky-500/25 bg-sky-500/5'
+          : 'border-emerald-500/20 bg-emerald-500/5'
+  const updateIconTone =
+    checking || updateStatus === 'idle'
+      ? 'bg-sky-500/15 text-sky-500'
+      : updateStatus === 'error'
+        ? 'bg-amber-500/15 text-amber-500'
+        : updateAvailable
+          ? 'bg-sky-500/15 text-sky-500'
+          : 'bg-emerald-500/15 text-emerald-500'
+
+  useEffect(() => {
+    void checkUpdate()
+  }, [checkUpdate])
 
   return (
     <div className="space-y-5">
@@ -78,6 +150,14 @@ export function AboutSettingsPanel() {
               <Badge variant="outline" className="text-[9px]">
                 {APP_VERSION_LABEL}
               </Badge>
+              {updateAvailable && (
+                <a href={UPDATE_GUIDE_URL} target="_blank" rel="noreferrer">
+                  <Badge className="gap-1 border-sky-500/20 bg-sky-500/15 text-[9px] text-sky-600 hover:bg-sky-500/20 dark:text-sky-300">
+                    <Download className="h-2.5 w-2.5" />
+                    有新版本 v{updateInfo?.latestVersion}
+                  </Badge>
+                </a>
+              )}
               <Badge className="bg-emerald-500/15 text-[9px] text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-300">
                 服务端模式
               </Badge>
@@ -89,6 +169,89 @@ export function AboutSettingsPanel() {
           </div>
         </div>
       </div>
+
+      <SettingsSection
+        title="版本更新"
+        description="检查 Docker Hub 镜像和 GitHub 源码中是否发布了比当前更新的版本。成功结果缓存约 12 小时，手动检查会跳过缓存；检查只读取公开版本信息，不会上传站点数据。"
+        actions={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={checking}
+            onClick={() => void checkUpdate({ force: true })}
+          >
+            <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', checking && 'animate-spin')} />
+            检查更新
+          </Button>
+        }
+      >
+        <div className={cn('flex items-start gap-3 rounded-xl border p-3.5', updateTone)}>
+          <span
+            className={cn(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+              updateIconTone,
+            )}
+          >
+            {checking ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : updateStatus === 'error' ? (
+              <AlertCircle className="h-4 w-4" />
+            ) : updateStatus === 'idle' ? (
+              <RefreshCw className="h-4 w-4" />
+            ) : updateAvailable ? (
+              <Download className="h-4 w-4" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[13px] font-semibold">{updateTitle}</span>
+              {updateAvailable && (
+                <Badge className="bg-sky-500/15 text-[9px] text-sky-600 hover:bg-sky-500/15 dark:text-sky-300">
+                  v{updateInfo?.latestVersion}
+                </Badge>
+              )}
+            </div>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+              {updateDescription}
+            </p>
+            {updateInfo && (
+              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
+                <span>当前 {APP_VERSION_LABEL}</span>
+                <span>最新 v{updateInfo.latestVersion}</span>
+                <a
+                  href={UPDATE_DOCKER_HUB_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="break-all hover:text-foreground hover:underline"
+                >
+                  镜像 {updateInfo.image}
+                  {updateInfo.latestTag ? `:${updateInfo.latestTag}` : ''}
+                </a>
+                <span>来源 {updateSourceLabel(updateInfo.source)}</span>
+                <span>检查于 {formatCheckedAt(updateInfo.checkedAt)}</span>
+              </div>
+            )}
+            {updateAvailable && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button asChild size="sm">
+                  <a href={UPDATE_GUIDE_URL} target="_blank" rel="noreferrer">
+                    查看升级方法
+                    <ArrowUpRight className="ml-1.5 h-3.5 w-3.5" />
+                  </a>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <a href={UPDATE_REPOSITORY_URL} target="_blank" rel="noreferrer">
+                    GitHub 仓库
+                  </a>
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </SettingsSection>
 
       <div className="grid gap-3 sm:grid-cols-3">
         {[

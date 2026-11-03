@@ -29,6 +29,19 @@ export interface CloudState {
   updatedAt: number
 }
 
+export type CloudUpdateSource = 'docker-hub' | 'github' | 'docker-hub+github'
+
+export interface CloudUpdateInfo {
+  currentVersion: string | null
+  latestVersion: string
+  latestTag: string | null
+  image: string
+  source: CloudUpdateSource
+  publishedAt: number | null
+  checkedAt: number
+  updateAvailable: boolean | null
+}
+
 export interface CloudUploadResult {
   key: string
   url: string
@@ -128,6 +141,15 @@ export async function getCloudHealth(): Promise<CloudHealth | null> {
   } catch {
     return null
   }
+}
+
+export async function getCloudUpdate(
+  currentVersion: string,
+  options: { force?: boolean } = {},
+): Promise<CloudUpdateInfo> {
+  const query = new URLSearchParams({ current: currentVersion })
+  if (options.force) query.set('force', '1')
+  return api<CloudUpdateInfo>(`/update?${query.toString()}`, { timeoutMs: 15_000 })
 }
 
 export async function cloudLogin(password: string): Promise<CloudSession> {

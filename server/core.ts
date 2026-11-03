@@ -4,6 +4,13 @@
  * so the same code runs on Workers, Node 20+ and the test harness.
  */
 
+import {
+  compareVersions,
+  getLatestRelease,
+  normalizeVersion,
+  type LatestRelease,
+} from './update'
+
 export interface StoredState {
   data: unknown
   updatedAt: number
@@ -43,6 +50,8 @@ export interface ApiConfig {
   runtime?: string
   /** Extra platform detail, e.g. `Cloudflare-Workers` or `v22.14.0`. */
   platform?: string
+  /** Injectable version lookup for tests and private mirrors. */
+  updateChecker?: (options: { force?: boolean }) => Promise<LatestRelease>
 }
 
 const DEFAULT_STATE_MAX_BYTES = 8 * 1024 * 1024
@@ -396,6 +405,37 @@ async function handleHealth(config: ApiConfig): Promise<Response> {
   }
 }
 
+async function handleUpdate(config: ApiConfig, url: URL): Promise<Response> {
+  const requested = url.searchParams.get('current')?.trim() ?? ''
+  const currentVersion = requested ? normalizeVersion(requested) : null
+  const force = url.searchParams.get('force') === '1'
+  const updateChecker = config.updateChecker ?? getLatestRelease
+
+  let latest: LatestRelease
+  try {
+    latest = await updateChecker({ force })
+  } catch (error) {
+    console.error('[hares-panel] update check failed', error)
+    return json(502, {
+      error: 'update_check_failed',
+      message: '无法检查更新，请确认服务器可以访问 Docker Hub / GitHub 后重试',
+    })
+  }
+
+  return json(200, {
+    currentVersion,
+    latestVersion: latest.latestVersion,
+    latestTag: latest.latestTag,
+    image: latest.image,
+    source: latest.source,
+    publishedAt: latest.publishedAt,
+    checkedAt: latest.checkedAt,
+    updateAvailable: currentVersion
+      ? compareVersions(latest.latestVersion, currentVersion) > 0
+      : null,
+  })
+}
+
 async function handleLogin(request: Request, config: ApiConfig): Promise<Response> {
   if (!config.state) {
     return json(503, { error: 'not_configured', message: '云端存储尚未配置' })
@@ -583,6 +623,10 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (path === '/api/health') {
       if (request.method !== 'GET') return json(405, { error: 'method_not_allowed' })
       return await handleHealth(config)
+    }
+    if (path === '/api/update') {
+      if (request.method !== 'GET') return json(405, { error: 'method_not_allowed' })
+      return await handleUpdate(config, url)
     }
     if (path === '/api/login') {
       if (request.method !== 'POST') return json(405, { error: 'method_not_allowed' })

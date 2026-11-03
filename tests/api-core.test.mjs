@@ -129,6 +129,50 @@ await test('health reports configured storage and assets', async () => {
   assert.equal(body.auth, true)
 })
 
+function updateConfig(latestVersion = '0.2.0') {
+  return makeConfig({
+    updateChecker: async () => ({
+      latestVersion,
+      latestTag: latestVersion,
+      image: 'hareswit2265/hares-panel',
+      source: 'docker-hub',
+      publishedAt: 1_700_000_000_000,
+      checkedAt: 1_700_000_001_000,
+    }),
+  })
+}
+
+await test('update endpoint reports a newer release', async () => {
+  const response = await call(updateConfig(), '/api/update?current=0.1.1')
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(body.currentVersion, '0.1.1')
+  assert.equal(body.latestVersion, '0.2.0')
+  assert.equal(body.updateAvailable, true)
+  assert.equal(body.image, 'hareswit2265/hares-panel')
+  assert.equal(body.source, 'docker-hub')
+})
+
+await test('update endpoint treats prereleases as older than the release', async () => {
+  const body = await (await call(updateConfig('0.2.0'), '/api/update?current=0.2.0-beta.1')).json()
+  assert.equal(body.updateAvailable, true)
+
+  const current = await (await call(updateConfig('0.2.0'), '/api/update?current=0.2.1')).json()
+  assert.equal(current.updateAvailable, false)
+})
+
+await test('update endpoint reports lookup failures', async () => {
+  const config = makeConfig({
+    updateChecker: async () => {
+      throw new Error('offline')
+    },
+  })
+  const response = await call(config, '/api/update?current=0.1.1')
+  const body = await response.json()
+  assert.equal(response.status, 502)
+  assert.equal(body.error, 'update_check_failed')
+})
+
 await test('login rejects a wrong password', async () => {
   const { response, body } = await login(makeConfig(), 'wrong', '10.0.0.2')
   assert.equal(response.status, 401)

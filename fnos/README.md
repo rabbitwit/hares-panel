@@ -30,7 +30,7 @@ fnos/
 | compose `volumes` | `${TRIM_PKGVAR}/data:/data` | 数据持久化，升级保留 |
 | `app/ui/config` 的 `port` | `18000` | 桌面入口访问端口 |
 
-镜像使用 Docker Hub 上的 `harswit2265/hares-panel:latest`。
+镜像使用 Docker Hub 上的 `hareswit2265/hares-panel:latest`。
 
 ## 打包
 

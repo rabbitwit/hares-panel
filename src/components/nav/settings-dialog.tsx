@@ -32,6 +32,7 @@ import { AboutSettingsPanel } from '@/components/nav/settings/about-settings'
 import { useAppStore } from '@/store/app-store'
 import { useSessionStore } from '@/store/session-store'
 import { useUiStore, type SettingsTab } from '@/store/ui-store'
+import { useUpdateStore } from '@/store/update-store'
 import { UserAvatar } from '@/components/nav/user-avatar'
 import { cn } from '@/lib/utils'
 import { APP_VERSION_LABEL } from '@/lib/version'
@@ -84,12 +85,19 @@ export function SettingsDialog() {
   const close = useUiStore((state) => state.closeSettings)
   const config = useAppStore((state) => state.config)
   const session = useSessionStore((state) => state.session)
+  const updateInfo = useUpdateStore((state) => state.info)
+  const checkUpdate = useUpdateStore((state) => state.check)
+  const updateAvailable = Boolean(updateInfo?.updateAvailable)
   const visibleTabs = tabs
   const adminName = config.adminName.trim() || '管理员'
 
   useEffect(() => {
     if (open && !session) close()
   }, [close, open, session])
+
+  useEffect(() => {
+    if (open && session) void checkUpdate()
+  }, [checkUpdate, open, session])
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && close()}>
@@ -141,6 +149,12 @@ export function SettingsDialog() {
                   >
                     <Icon className="h-4 w-4 shrink-0" />
                     <span className="truncate">{tab.label}</span>
+                    {tab.id === 'about' && updateAvailable && (
+                      <span
+                        className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500"
+                        aria-label="有新版本"
+                      />
+                    )}
                   </button>
                 )
               })}
@@ -200,6 +214,12 @@ export function SettingsDialog() {
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {tab.label}
+                      {tab.id === 'about' && updateAvailable && (
+                        <span
+                          className="h-1.5 w-1.5 rounded-full bg-sky-500"
+                          aria-label="有新版本"
+                        />
+                      )}
                     </button>
                   )
                 })}
@@ -213,9 +233,21 @@ export function SettingsDialog() {
                   <ShieldCheck className="h-3 w-3 text-emerald-500" />
                   公开访问读取服务端数据，账号信息不会公开
                 </span>
-                <Badge variant="outline" className="h-5 text-[9px] font-normal">
-                  {APP_VERSION_LABEL}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  {updateAvailable && (
+                    <button
+                      type="button"
+                      onClick={() => setTab('about')}
+                      className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2 py-0.5 text-[9px] font-medium text-sky-600 transition-colors hover:bg-sky-500/15 dark:text-sky-300"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
+                      有新版本
+                    </button>
+                  )}
+                  <Badge variant="outline" className="h-5 text-[9px] font-normal">
+                    {APP_VERSION_LABEL}
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>

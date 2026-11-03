@@ -3,6 +3,178 @@
 // server/edgeone-entry.ts
 import { getStore } from "@edgeone/pages-blob";
 
+// server/update.ts
+var DOCKER_HUB_IMAGE = "hareswit2265/hares-panel";
+var GITHUB_REPOSITORY = "rabbitwit/hares-panel";
+var DOCKER_HUB_TAGS_URL = `https://hub.docker.com/v2/repositories/${DOCKER_HUB_IMAGE}/tags?page_size=100&ordering=last_updated`;
+var GITHUB_PACKAGE_URL = `https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/package.json`;
+var JSDELIVR_PACKAGE_URL = `https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@main/package.json`;
+var REQUEST_TIMEOUT_MS = 8e3;
+var CACHE_TTL_MS = 12 * 60 * 60 * 1e3;
+var FAILURE_RETRY_MS = 10 * 60 * 1e3;
+var VERSION_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/;
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function parseVersion(input) {
+  const match = VERSION_PATTERN.exec(input.trim());
+  if (!match) return null;
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2]),
+    patch: Number(match[3]),
+    prerelease: match[4] ? match[4].split(".").filter(Boolean) : []
+  };
+}
+function normalizeVersion(input) {
+  const parsed = parseVersion(input);
+  if (!parsed) return null;
+  const base = `${parsed.major}.${parsed.minor}.${parsed.patch}`;
+  return parsed.prerelease.length ? `${base}-${parsed.prerelease.join(".")}` : base;
+}
+function comparePrerelease(left, right) {
+  if (left.length === 0 && right.length === 0) return 0;
+  if (left.length === 0) return 1;
+  if (right.length === 0) return -1;
+  const length = Math.max(left.length, right.length);
+  for (let index = 0; index < length; index += 1) {
+    const a = left[index];
+    const b = right[index];
+    if (a === void 0) return -1;
+    if (b === void 0) return 1;
+    if (a === b) continue;
+    const aNumeric = /^\d+$/.test(a);
+    const bNumeric = /^\d+$/.test(b);
+    if (aNumeric && bNumeric) {
+      const difference = Number(a) - Number(b);
+      if (difference !== 0) return difference > 0 ? 1 : -1;
+      continue;
+    }
+    if (aNumeric) return -1;
+    if (bNumeric) return 1;
+    return a.localeCompare(b) > 0 ? 1 : -1;
+  }
+  return 0;
+}
+function compareVersions(left, right) {
+  const a = parseVersion(left);
+  const b = parseVersion(right);
+  if (!a || !b) return 0;
+  if (a.major !== b.major) return a.major > b.major ? 1 : -1;
+  if (a.minor !== b.minor) return a.minor > b.minor ? 1 : -1;
+  if (a.patch !== b.patch) return a.patch > b.patch ? 1 : -1;
+  return comparePrerelease(a.prerelease, b.prerelease);
+}
+async function fetchJson(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      headers: { accept: "application/json" },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`${url} responded with ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+function toTimestamp(value) {
+  if (typeof value !== "string") return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+function dockerHubCandidates(value) {
+  if (!isRecord(value) || !Array.isArray(value.results)) return [];
+  const tags = value.results.filter(isRecord);
+  const latest = tags.find((tag) => tag.name === "latest");
+  const latestDigest = typeof latest?.digest === "string" ? latest.digest : null;
+  const candidates = tags.flatMap((tag) => {
+    if (typeof tag.name !== "string") return [];
+    const version = normalizeVersion(tag.name);
+    if (!version) return [];
+    return [
+      {
+        version,
+        tag: tag.name,
+        publishedAt: toTimestamp(tag.last_updated),
+        origin: "docker-hub",
+        digest: typeof tag.digest === "string" ? tag.digest : null
+      }
+    ];
+  });
+  if (latestDigest) {
+    const matching = candidates.filter((candidate) => candidate.digest === latestDigest);
+    if (matching.length > 0) return matching;
+  }
+  return candidates;
+}
+function packageCandidate(value) {
+  if (!isRecord(value) || typeof value.version !== "string") return null;
+  const version = normalizeVersion(value.version);
+  if (!version) return null;
+  return { version, tag: null, publishedAt: null, origin: "github" };
+}
+function pickLatest(candidates) {
+  let best = null;
+  for (const candidate of candidates) {
+    if (!best || compareVersions(candidate.version, best.version) > 0) best = candidate;
+  }
+  return best;
+}
+async function fetchLatestRelease() {
+  const [dockerHub, github, jsdelivr] = await Promise.allSettled([
+    fetchJson(DOCKER_HUB_TAGS_URL).then(dockerHubCandidates),
+    fetchJson(GITHUB_PACKAGE_URL).then(packageCandidate),
+    fetchJson(JSDELIVR_PACKAGE_URL).then(packageCandidate)
+  ]);
+  const candidates = [];
+  if (dockerHub.status === "fulfilled") candidates.push(...dockerHub.value);
+  if (github.status === "fulfilled" && github.value) candidates.push(github.value);
+  if (jsdelivr.status === "fulfilled" && jsdelivr.value) candidates.push(jsdelivr.value);
+  const best = pickLatest(candidates);
+  if (!best) throw new Error("No published version information is available");
+  const matchesBest = (candidate) => compareVersions(candidate.version, best.version) === 0;
+  const fromDockerHub = candidates.some(
+    (candidate) => candidate.origin === "docker-hub" && matchesBest(candidate)
+  );
+  const fromGithub = candidates.some(
+    (candidate) => candidate.origin === "github" && matchesBest(candidate)
+  );
+  const source = fromDockerHub && fromGithub ? "docker-hub+github" : fromDockerHub ? "docker-hub" : "github";
+  return {
+    latestVersion: best.version,
+    latestTag: best.tag,
+    image: DOCKER_HUB_IMAGE,
+    source,
+    publishedAt: best.publishedAt,
+    checkedAt: Date.now()
+  };
+}
+var cached = null;
+var failure = null;
+var pending = null;
+async function getLatestRelease(options = {}) {
+  const now = Date.now();
+  if (!options.force && cached && cached.expiresAt > now) return cached.value;
+  if (!options.force && failure) {
+    if (failure.retryAt > now) throw failure.error;
+    failure = null;
+  }
+  if (pending) return pending;
+  pending = fetchLatestRelease().then((value) => {
+    cached = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+    failure = null;
+    return value;
+  }).catch((error) => {
+    failure = { error, retryAt: Date.now() + FAILURE_RETRY_MS };
+    throw error;
+  }).finally(() => {
+    pending = null;
+  });
+  return pending;
+}
+
 // server/core.ts
 var DEFAULT_STATE_MAX_BYTES = 8 * 1024 * 1024;
 var DEFAULT_ASSET_MAX_BYTES = 6 * 1024 * 1024;
@@ -52,7 +224,7 @@ async function readJsonLimited(request, maxBytes) {
     return { ok: false, tooLarge: false };
   }
 }
-function isRecord(value) {
+function isRecord2(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function json(status, body, headers = {}) {
@@ -148,7 +320,7 @@ async function requireAuth(request, config) {
   return null;
 }
 function isAppData(value) {
-  if (!isRecord(value) || !isRecord(value.config)) return false;
+  if (!isRecord2(value) || !isRecord2(value.config)) return false;
   return ["groups", "items", "searchEngines", "gallery"].every(
     (key) => Array.isArray(value[key])
   );
@@ -160,7 +332,7 @@ function sanitizeState(value) {
   delete config.announcementText;
   config.defaultOpenMode = config.defaultOpenMode === "self" ? "self" : "new";
   const items = value.items.map((item) => {
-    if (!isRecord(item)) return item;
+    if (!isRecord2(item)) return item;
     const next = { ...item };
     delete next.windowWidth;
     delete next.windowHeight;
@@ -194,17 +366,17 @@ function publicState(data, options = {}) {
   const groups = Array.isArray(state.groups) ? state.groups : [];
   const items = Array.isArray(state.items) ? state.items : [];
   const visibleGroups = groups.filter(
-    (group) => isRecord(group) && !group.hidden
+    (group) => isRecord2(group) && !group.hidden
   );
   const visibleGroupIds = new Set(
-    visibleGroups.map((group) => isRecord(group) && typeof group.id === "string" ? group.id : null).filter((id) => Boolean(id))
+    visibleGroups.map((group) => isRecord2(group) && typeof group.id === "string" ? group.id : null).filter((id) => Boolean(id))
   );
   return {
     ...state,
     config: publicConfig,
     groups: visibleGroups,
     items: items.filter(
-      (item) => isRecord(item) && !item.hidden && typeof item.groupId === "string" && visibleGroupIds.has(item.groupId)
+      (item) => isRecord2(item) && !item.hidden && typeof item.groupId === "string" && visibleGroupIds.has(item.groupId)
     )
   };
 }
@@ -294,6 +466,32 @@ async function handleHealth(config) {
     return json(200, healthBody(config, false, "storage_unavailable"));
   }
 }
+async function handleUpdate(config, url) {
+  const requested = url.searchParams.get("current")?.trim() ?? "";
+  const currentVersion = requested ? normalizeVersion(requested) : null;
+  const force = url.searchParams.get("force") === "1";
+  const updateChecker = config.updateChecker ?? getLatestRelease;
+  let latest;
+  try {
+    latest = await updateChecker({ force });
+  } catch (error) {
+    console.error("[hares-panel] update check failed", error);
+    return json(502, {
+      error: "update_check_failed",
+      message: "\u65E0\u6CD5\u68C0\u67E5\u66F4\u65B0\uFF0C\u8BF7\u786E\u8BA4\u670D\u52A1\u5668\u53EF\u4EE5\u8BBF\u95EE Docker Hub / GitHub \u540E\u91CD\u8BD5"
+    });
+  }
+  return json(200, {
+    currentVersion,
+    latestVersion: latest.latestVersion,
+    latestTag: latest.latestTag,
+    image: latest.image,
+    source: latest.source,
+    publishedAt: latest.publishedAt,
+    checkedAt: latest.checkedAt,
+    updateAvailable: currentVersion ? compareVersions(latest.latestVersion, currentVersion) > 0 : null
+  });
+}
 async function handleLogin(request, config) {
   if (!config.state) {
     return json(503, { error: "not_configured", message: "\u4E91\u7AEF\u5B58\u50A8\u5C1A\u672A\u914D\u7F6E" });
@@ -348,7 +546,7 @@ async function handleState(request, config, url) {
       if (!data2) return json(500, { error: "invalid_state", message: "\u670D\u52A1\u7AEF\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E" });
       return json(200, { data: data2, updatedAt: stored.updatedAt });
     }
-    const storedConfig = isRecord(stored.data) && isRecord(stored.data.config) ? stored.data.config : null;
+    const storedConfig = isRecord2(stored.data) && isRecord2(stored.data.config) ? stored.data.config : null;
     const locked = storedConfig?.publicAccess === false;
     const data = publicState(stored.data, { locked });
     if (!data) return json(500, { error: "invalid_state", message: "\u670D\u52A1\u7AEF\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E" });
@@ -464,6 +662,10 @@ async function handleApi(request, config) {
     if (path === "/api/health") {
       if (request.method !== "GET") return json(405, { error: "method_not_allowed" });
       return await handleHealth(config);
+    }
+    if (path === "/api/update") {
+      if (request.method !== "GET") return json(405, { error: "method_not_allowed" });
+      return await handleUpdate(config, url);
     }
     if (path === "/api/login") {
       if (request.method !== "POST") return json(405, { error: "method_not_allowed" });

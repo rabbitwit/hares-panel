@@ -266,6 +266,8 @@ docker image prune -f
 
 升级不会影响 `./data`。升级前仍建议先备份该目录。
 
+> 管理控制台「关于」页会对比 Docker Hub 上的最新版本，有新版本时显示提示。检查需要容器能访问 `hub.docker.com`、`raw.githubusercontent.com` 或 `cdn.jsdelivr.net`。
+
 ## 常见问题
 
 **镜像拉取失败？**

@@ -4,7 +4,7 @@
 
 # Hares-Panel
 
-Hares-Panel 是一个面向 NAS、家庭服务器和云主机的导航首页。前端与 API 打包在同一个镜像中，只依赖一个持久化目录即可运行。 [[DOME]](https://dome.hares.eu.cc)
+Hares-Panel 是一个面向 NAS、家庭服务器和云主机的导航首页。前端与 API 打包在同一个镜像中，只依赖一个持久化目录即可运行。 [[DEMO]](https://demo.hares.eu.cc)
 
 ![首页 · 深色](docs/home-dark.png)
 
@@ -27,6 +27,7 @@ Hares-Panel 是一个面向 NAS、家庭服务器和云主机的导航首页。�
 | 服务端存储 | 导航数据保存到 Cloudflare KV / D1、Vercel Upstash Redis、EdgeOne Blob 或 Docker 本地文件；启动即从 API 读取 |
 | 对象存储 | 图片与图标保存到 Cloudflare R2、Vercel Blob、EdgeOne Blob 或 Docker 本地 `assets/`，数据库只存 URL 与对象 key |
 | 自托管 | Docker 一键部署，直连高位端口（默认 18000）；状态与图片持久化到 `./data` |
+| 版本更新 | 「关于」页自动检查 Docker Hub 镜像与 GitHub 源码版本，发现新版本时显示提示和升级入口 |
 | 管理员认证 | 密码来自环境变量 `ADMIN_PASSWORD`；HMAC 签名令牌，7 天滑动有效期（访问自动续期） |
 | 个人资料 | 管理员可自定义头像与显示名称，支持图片 URL、本地上传或图库引用，显示在右上角账户菜单 |
 | 备份恢复 | 导出/导入 JSON 快照，自动保存到服务端；支持自动识别 FlatNas / Sun-Panel 备份并导入分组与卡片；图库只保存图片地址 |
@@ -995,6 +996,7 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 | 方法 | 路径 | 鉴权 | 说明 |
 | --- | --- | --- | --- |
 | `GET` | `/api/health` | 否 | 存储类型、对象存储、密码是否已设置 |
+| `GET` | `/api/update?current=0.1.1` | 否 | 对比 Docker Hub / GitHub 的最新版本，返回是否有更新（成功结果缓存约 12 小时） |
 | `POST` | `/api/login` | 密码 | 校验 `ADMIN_PASSWORD`，返回 HMAC 令牌（按 IP 限流） |
 | `POST` | `/api/session/refresh` | Bearer | 续期登录令牌，返回新的 7 天令牌与到期时间 |
 | `GET` | `/api/state` | 否 | 公开投影（不含访客隐藏的卡片/分组）；关闭公开访问时返回配置与空内容（`locked`） |
@@ -1027,6 +1029,17 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 - **平台数据不互通**：Cloudflare、Vercel、EdgeOne、Docker 的状态和图片存储互相独立，切换平台不会自动迁移。
 - **KV 写入限制**：同一 key 约 1 次/秒且最终一致，频繁编辑建议使用 D1。
 - **依赖安全公告**：`npm audit` 会报告 Vite / Wrangler 等构建工具与 Vercel Blob SDK 的传递依赖公告；前端静态产物不受影响。
+
+## 升级与版本检查
+
+管理控制台「关于」页会读取 Docker Hub 镜像标签、GitHub 主分支的 `package.json`（以及 jsDelivr 镜像）来判断是否有新版本。只要有任一来源返回比当前构建更高的版本，侧边栏「关于」和版本号旁就会显示「有新版本」，并提供升级说明入口。
+
+- 检查只读取公开版本信息，不会上传导航数据、图片或凭据；成功结果缓存约 12 小时，失败结果保留 10 分钟，避免离线环境反复请求。
+- 「关于」页的「检查更新」会跳过缓存立即刷新。
+- 版本提示按已发布的语义化版本号比较；同一版本号重新构建镜像（例如只更新基础镜像）不会单独提示。
+- 检查需要服务端能访问 `hub.docker.com`、`raw.githubusercontent.com` 或 `cdn.jsdelivr.net`；内网隔离环境可在「关于」页手动重试。
+- Docker 升级：`docker compose pull && docker compose up -d`（升级不会删除 `./data`）。
+- 飞牛应用：在应用中心升级 `.fpk`；Cloudflare / Vercel / EdgeOne：拉取新代码后重新部署。
 
 ## 常见问题
 

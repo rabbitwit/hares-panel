@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Check, FolderPlus, Images, PencilLine, Plus, Settings2 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -11,17 +12,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useAppStore } from '@/store/app-store'
 import { useSessionStore } from '@/store/session-store'
 import { useUiStore } from '@/store/ui-store'
+import { useUpdateStore } from '@/store/update-store'
 import { cn } from '@/lib/utils'
 
 function DockButton({
   label,
   onClick,
   active,
+  indicator,
   children,
 }: {
   label: string
   onClick: () => void
   active?: boolean
+  indicator?: boolean
   children: React.ReactNode
 }) {
   return (
@@ -32,11 +36,14 @@ function DockButton({
           onClick={onClick}
           aria-label={label}
           className={cn(
-            'flex h-9 w-9 items-center justify-center rounded-xl text-foreground/55 transition-all hover:bg-foreground/12 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30',
+            'relative flex h-9 w-9 items-center justify-center rounded-xl text-foreground/55 transition-all hover:bg-foreground/12 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30',
             active && 'bg-violet-500/20 text-violet-200 hover:bg-violet-500/25 hover:text-violet-100',
           )}
         >
           {children}
+          {indicator && (
+            <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-sky-400 ring-2 ring-background" />
+          )}
         </button>
       </TooltipTrigger>
       <TooltipContent side="left" sideOffset={10}>
@@ -56,6 +63,12 @@ export function FloatingDock() {
   const openGroupDialog = useUiStore((state) => state.openGroupDialog)
   const openGallery = useUiStore((state) => state.openGallery)
   const openSettings = useUiStore((state) => state.openSettings)
+  const checkUpdate = useUpdateStore((state) => state.check)
+  const updateAvailable = useUpdateStore((state) => Boolean(state.info?.updateAvailable))
+
+  useEffect(() => {
+    if (session) void checkUpdate()
+  }, [checkUpdate, session])
 
   const user = session
   if (!user) return null
@@ -136,7 +149,11 @@ export function FloatingDock() {
           <Images className="h-4 w-4" />
         </DockButton>
 
-        <DockButton label="管理设置" onClick={() => openSettings('site')}>
+        <DockButton
+          label={updateAvailable ? '管理设置 · 有新版本' : '管理设置'}
+          indicator={updateAvailable}
+          onClick={() => openSettings('site')}
+        >
           <Settings2 className="h-4 w-4" />
         </DockButton>
       </div>
