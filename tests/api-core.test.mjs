@@ -478,5 +478,134 @@ await test('unknown API routes return JSON 404', async () => {
   assert.equal((await response.json()).error, 'not_found')
 })
 
+await test('bing wallpaper proxy returns the upstream image URL', async () => {
+  const upstream = {
+    format_date: '2026-11-04',
+    url: 'https://cn.bing.com/th?id=OHR.Example_1920x1080.jpg',
+    title: 'Bing 每日壁纸',
+    copy_right: '图片版权信息',
+  }
+  const seen = []
+  const config = makeConfig({
+    syncFetch: async (input, init) => {
+      seen.push({ url: String(input), init })
+      return new Response(JSON.stringify(upstream), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    },
+  })
+
+  const response = await call(config, '/api/wallpaper/bing')
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(body.url, upstream.url)
+  // The default endpoint must be the JSON form so we can read the image URL.
+  assert.match(seen[0].url, /^https:\/\/api\.bimg\.cc\/today$/)
+})
+
+await test('bing wallpaper proxy reads the api.bimg.cc array format', async () => {
+  const seen = []
+  const config = makeConfig({
+    syncFetch: async (input, init) => {
+      seen.push({ url: String(input), init })
+      return new Response(
+        JSON.stringify({
+          code: 200,
+          msg: '操作成功',
+          data: [
+            {
+              id: 1,
+              title: '今天我们去爬山吧',
+              url: 'https://cn.bing.com/th?id=OHR.Example_1920x1080.jpg',
+              datetime: '2022-10-04',
+              copyright: '© 图片版权信息',
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    },
+  })
+
+  const endpoint = 'https://api.bimg.cc/random?w=1920&h=1080&mkt=zh-CN'
+  const response = await call(
+    config,
+    `/api/wallpaper/bing?url=${encodeURIComponent(endpoint)}`,
+  )
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(seen[0], endpoint)
+  assert.equal(body.url, 'https://cn.bing.com/th?id=OHR.Example_1920x1080.jpg')
+})
+
+await test('bing wallpaper proxy forwards an allowed custom endpoint', async () => {
+  const seen = []
+  const config = makeConfig({
+    syncFetch: async (input) => {
+      seen.push(String(input))
+      return new Response(JSON.stringify({ url: 'https://cn.bing.com/th?id=OHR.Random.jpg' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    },
+  })
+
+  const endpoint = 'https://bing.xinac.net/api/random?format=json'
+  const response = await call(
+    config,
+    `/api/wallpaper/bing?url=${encodeURIComponent(endpoint)}`,
+  )
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(seen[0], endpoint)
+  assert.equal(body.url, 'https://cn.bing.com/th?id=OHR.Random.jpg')
+})
+
+await test('bing wallpaper proxy accepts an arbitrary self-hosted endpoint', async () => {
+  const seen = []
+  const config = makeConfig({
+    syncFetch: async (input, init) => {
+      seen.push({ url: String(input), init })
+      return new Response(
+        JSON.stringify({ code: 200, msg: 'ok', data: [{ url: 'https://selfhosted.example/ohr.jpg' }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      )
+    },
+  })
+
+  const endpoint = 'http://192.168.1.50:8080/api/today'
+  const response = await call(
+    config,
+    `/api/wallpaper/bing?url=${encodeURIComponent(endpoint)}`,
+  )
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(seen[0].url, endpoint)
+  assert.equal(body.url, 'https://selfhosted.example/ohr.jpg')
+})
+
+await test('bing wallpaper proxy reports upstream failures', async () => {
+  const config = makeConfig({
+    syncFetch: async () => new Response('nope', { status: 500 }),
+  })
+  const response = await call(config, '/api/wallpaper/bing')
+  assert.equal(response.status, 502)
+  assert.equal((await response.json()).error, 'upstream_failed')
+})
+
+await test('bing wallpaper proxy rejects a payload without an image URL', async () => {
+  const config = makeConfig({
+    syncFetch: async () =>
+      new Response(JSON.stringify({ title: 'missing' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+  })
+  const response = await call(config, '/api/wallpaper/bing')
+  assert.equal(response.status, 502)
+  assert.equal((await response.json()).error, 'upstream_no_image')
+})
+
 console.log(`\n${passed} passed, ${failed} failed\n`)
 if (failed > 0) process.exitCode = 1

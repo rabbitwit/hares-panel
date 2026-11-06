@@ -1,0 +1,23 @@
+[
+  {
+    "stepTitle": "管理员密码",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "设置用于登录 Hares-Panel 管理界面的管理员密码。若留空，首次启动时会自动生成随机密码（查看容器日志或数据目录里的 admin-password）。"
+      },
+      {
+        "type": "password",
+        "field": "wizard_admin_password",
+        "label": "管理员密码",
+        "initValue": "",
+        "rules": [
+          {
+            "min": 4,
+            "message": "密码至少 4 个字符（留空则自动生成）"
+          }
+        ]
+      }
+    ]
+  }
+]

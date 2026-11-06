@@ -1,1 +1,4 @@
-#!/bin/bash`n# Called before uninstall. Data stays unless the user removes it.`nexit 0`n
+#!/bin/bash
+# Called before uninstall. Data is kept or removed based on the choice made in
+# the uninstall wizard (wizard/uninstall); see uninstall_callback.
+exit 0

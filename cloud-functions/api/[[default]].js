@@ -175,9 +175,766 @@ async function getLatestRelease(options = {}) {
   return pending;
 }
 
-// server/core.ts
+// server/sync.ts
+var SyncError = class extends Error {
+  status;
+  code;
+  constructor(status, code, message) {
+    super(message);
+    this.name = "SyncError";
+    this.status = status;
+    this.code = code;
+  }
+};
+var REQUEST_TIMEOUT_MS2 = 2e4;
+var ASSET_TIMEOUT_MS = 6e4;
+var MAX_REMOTE_STATE_BYTES = 32 * 1024 * 1024;
 var DEFAULT_STATE_MAX_BYTES = 8 * 1024 * 1024;
 var DEFAULT_ASSET_MAX_BYTES = 6 * 1024 * 1024;
+var MAX_WARNINGS = 5;
+var IMAGE_TYPES = /* @__PURE__ */ new Map([
+  ["image/png", "png"],
+  ["image/jpeg", "jpg"],
+  ["image/webp", "webp"],
+  ["image/gif", "gif"],
+  ["image/svg+xml", "svg"],
+  ["image/avif", "avif"],
+  ["image/x-icon", "ico"],
+  ["image/vnd.microsoft.icon", "ico"]
+]);
+function isRecord2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function isSyncData(value) {
+  if (!isRecord2(value) || !isRecord2(value.config)) return false;
+  return ["groups", "items", "searchEngines", "gallery"].every(
+    (key) => Array.isArray(value[key])
+  );
+}
+function cloneData(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+function readString(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+function normalizeMode(value) {
+  return value === "upload" || value === "download" ? value : "auto";
+}
+function normalizeRemoteBase(value) {
+  let text = value.trim();
+  if (!text) throw new SyncError(400, "remote_url_required", "\u8BF7\u8F93\u5165\u8FDC\u7AEF\u5730\u5740");
+  if (!/^https?:\/\//i.test(text)) text = `https://${text}`;
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    throw new SyncError(400, "bad_remote_url", "\u8FDC\u7AEF\u5730\u5740\u683C\u5F0F\u4E0D\u6B63\u786E");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new SyncError(400, "bad_remote_url", "\u8FDC\u7AEF\u5730\u5740\u53EA\u652F\u6301 http \u6216 https");
+  }
+  if (url.username || url.password) {
+    throw new SyncError(400, "bad_remote_url", "\u8FDC\u7AEF\u5730\u5740\u4E0D\u80FD\u5305\u542B\u7528\u6237\u540D\u6216\u5BC6\u7801");
+  }
+  url.hash = "";
+  url.search = "";
+  let pathname = url.pathname.replace(/\/+$/, "");
+  if (pathname.toLowerCase().endsWith("/api")) pathname = pathname.slice(0, -4);
+  return `${url.origin}${pathname}`;
+}
+function remoteSummary(health) {
+  const limits = isRecord2(health.limits) ? health.limits : null;
+  return {
+    app: typeof health.app === "string" ? health.app : "hares-panel",
+    version: typeof health.version === "number" ? health.version : null,
+    ok: health.ok === true,
+    runtime: typeof health.runtime === "string" ? health.runtime : null,
+    storage: typeof health.storage === "string" ? health.storage : null,
+    assets: typeof health.assets === "string" ? health.assets : null,
+    limits: limits ? {
+      stateBytes: typeof limits.stateBytes === "number" ? limits.stateBytes : DEFAULT_STATE_MAX_BYTES,
+      assetBytes: typeof limits.assetBytes === "number" ? limits.assetBytes : DEFAULT_ASSET_MAX_BYTES
+    } : null
+  };
+}
+function contentTypeExtension(contentType) {
+  return IMAGE_TYPES.get(contentType.toLowerCase().split(";")[0].trim()) ?? null;
+}
+function contentTypeFromKey(key) {
+  const extension = key.split(".").pop()?.toLowerCase() ?? "";
+  for (const [type, ext] of IMAGE_TYPES) {
+    if (ext === extension || extension === "jpeg" && ext === "jpg") return type;
+  }
+  return "application/octet-stream";
+}
+function normalizeContentType(value, key) {
+  const type = value.toLowerCase().split(";")[0].trim();
+  if (contentTypeExtension(type)) return type;
+  return contentTypeFromKey(key);
+}
+function stripAssetPrefix(key) {
+  return key.replace(/^hares-panel\//i, "");
+}
+function safeAssetKey(key) {
+  if (!key || key.length > 200 || key.startsWith("/") || key.includes("\\") || key.includes("..")) {
+    return null;
+  }
+  return /^[a-zA-Z0-9._/-]+$/.test(key) ? key : null;
+}
+function pickAssetKey(asset, contentType, used) {
+  const extension = contentTypeExtension(contentType) ?? "png";
+  let key = readString(asset.remoteKey);
+  if (!key && asset.dataUrl) {
+    try {
+      const pathname = new URL(asset.dataUrl, "https://placeholder.local/").pathname;
+      key = decodeURIComponent(pathname.split("/").pop() ?? "");
+    } catch {
+      key = "";
+    }
+  }
+  key = stripAssetPrefix(key);
+  if (!safeAssetKey(key)) key = "";
+  if (key && !/\.[a-z0-9]{2,5}$/i.test(key)) key = `${key}.${extension}`;
+  const unique = (candidate) => {
+    if (!used.has(candidate)) return candidate;
+    const dot = candidate.lastIndexOf(".");
+    const stem = dot > 0 ? candidate.slice(0, dot) : candidate;
+    const ext = dot > 0 ? candidate.slice(dot) : "";
+    return `${stem}-${crypto.randomUUID().slice(0, 8)}${ext}`;
+  };
+  const finalKey = unique(key || `asset-${crypto.randomUUID().replaceAll("-", "")}.${extension}`);
+  used.add(finalKey);
+  return finalKey;
+}
+function absoluteUrl(value, base) {
+  if (!value) return "";
+  if (/^(https?:|data:|blob:)/i.test(value)) return value;
+  if (!base) return value;
+  try {
+    return new URL(value, base.endsWith("/") ? base : `${base}/`).toString();
+  } catch {
+    return value;
+  }
+}
+function comparableData(data) {
+  const copy = cloneData(data);
+  copy.gallery = copy.gallery.map((asset) => {
+    const { dataUrl: _dataUrl, remoteKey: _remoteKey, ...rest } = asset;
+    return rest;
+  });
+  return JSON.stringify(copy);
+}
+async function readResponseBytes(response, maxBytes) {
+  const declared = Number(response.headers.get("content-length") || "0");
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new SyncError(413, "too_large", "\u8FDC\u7AEF\u8FD4\u56DE\u7684\u6570\u636E\u8D85\u8FC7\u5927\u5C0F\u9650\u5236");
+  }
+  if (!response.body) return new Uint8Array(0);
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new SyncError(413, "too_large", "\u8FDC\u7AEF\u8FD4\u56DE\u7684\u6570\u636E\u8D85\u8FC7\u5927\u5C0F\u9650\u5236");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged;
+}
+async function readResponseJson(response, maxBytes = 256 * 1024) {
+  const bytes = await readResponseBytes(response, maxBytes);
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    throw new SyncError(502, "bad_remote_response", "\u8FDC\u7AEF\u8FD4\u56DE\u4E86\u65E0\u6CD5\u8BC6\u522B\u7684\u6570\u636E");
+  }
+}
+async function readRemoteError(response) {
+  try {
+    const payload = await readResponseJson(response);
+    if (typeof payload.message === "string" && payload.message.trim()) {
+      return payload.message.trim();
+    }
+    if (typeof payload.error === "string" && payload.error.trim()) return payload.error;
+  } catch {
+  }
+  return `\u8FDC\u7AEF\u8BF7\u6C42\u5931\u8D25\uFF08${response.status}\uFF09`;
+}
+async function remoteFetch(options, url, init = {}, timeoutMs = REQUEST_TIMEOUT_MS2) {
+  const fetcher = options.fetchImpl ?? fetch;
+  try {
+    return await fetcher(url, {
+      ...init,
+      redirect: init.redirect ?? "follow",
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+  } catch (error) {
+    if (error instanceof SyncError) throw error;
+    throw new SyncError(
+      502,
+      "remote_unreachable",
+      "\u65E0\u6CD5\u8FDE\u63A5\u8FDC\u7AEF\u5B9E\u4F8B\uFF0C\u8BF7\u68C0\u67E5\u5730\u5740\u3001\u7F51\u7EDC\u6216 HTTPS \u53CD\u5411\u4EE3\u7406"
+    );
+  }
+}
+async function connectRemote(options, remoteUrl, password) {
+  const base = normalizeRemoteBase(remoteUrl);
+  const origin = new URL(base).origin;
+  const healthResponse = await remoteFetch(options, `${base}/api/health`, {
+    headers: { accept: "application/json" }
+  });
+  if (!healthResponse.ok) {
+    throw new SyncError(
+      502,
+      "remote_health_failed",
+      `\u8FDC\u7AEF\u5065\u5EB7\u68C0\u67E5\u5931\u8D25\uFF1A${await readRemoteError(healthResponse)}`
+    );
+  }
+  const health = await readResponseJson(healthResponse);
+  if (health.app && health.app !== "hares-panel") {
+    throw new SyncError(400, "remote_not_hares", "\u8FDC\u7AEF\u5730\u5740\u4E0D\u662F Hares-Panel \u5B9E\u4F8B");
+  }
+  if (health.ok === false) {
+    throw new SyncError(502, "remote_storage_unavailable", "\u8FDC\u7AEF\u670D\u52A1\u7AEF\u5B58\u50A8\u6682\u65F6\u4E0D\u53EF\u7528");
+  }
+  if (!health.storage) {
+    throw new SyncError(502, "remote_storage_missing", "\u8FDC\u7AEF\u5C1A\u672A\u914D\u7F6E KV / D1 / Redis / Blob \u5B58\u50A8");
+  }
+  if (health.auth === false) {
+    throw new SyncError(502, "remote_no_password", "\u8FDC\u7AEF\u5C1A\u672A\u8BBE\u7F6E ADMIN_PASSWORD");
+  }
+  const loginResponse = await remoteFetch(options, `${base}/api/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ password })
+  });
+  if (!loginResponse.ok) {
+    if (loginResponse.status === 401) {
+      throw new SyncError(401, "remote_auth_failed", "\u8FDC\u7AEF\u7BA1\u7406\u5458\u5BC6\u7801\u4E0D\u6B63\u786E");
+    }
+    if (loginResponse.status === 429) {
+      throw new SyncError(429, "remote_rate_limited", "\u8FDC\u7AEF\u767B\u5F55\u5C1D\u8BD5\u8FC7\u4E8E\u9891\u7E41\uFF0C\u8BF7\u7A0D\u540E\u518D\u8BD5");
+    }
+    throw new SyncError(
+      502,
+      "remote_login_failed",
+      `\u8FDC\u7AEF\u767B\u5F55\u5931\u8D25\uFF1A${await readRemoteError(loginResponse)}`
+    );
+  }
+  const session = await readResponseJson(loginResponse);
+  if (typeof session.token !== "string" || !session.token) {
+    throw new SyncError(502, "remote_login_failed", "\u8FDC\u7AEF\u767B\u5F55\u5931\u8D25\uFF1A\u672A\u8FD4\u56DE\u767B\u5F55\u4EE4\u724C");
+  }
+  return { base, token: session.token, health, origin };
+}
+async function readRemoteState(options, remote) {
+  const response = await remoteFetch(options, `${remote.base}/api/state?full=1`, {
+    headers: {
+      authorization: `Bearer ${remote.token}`,
+      accept: "application/json"
+    }
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new SyncError(
+      502,
+      "remote_state_failed",
+      `\u8BFB\u53D6\u8FDC\u7AEF\u6570\u636E\u5931\u8D25\uFF1A${await readRemoteError(response)}`
+    );
+  }
+  const payload = await readResponseJson(
+    response,
+    MAX_REMOTE_STATE_BYTES
+  );
+  if (!isSyncData(payload.data)) {
+    throw new SyncError(502, "remote_bad_state", "\u8FDC\u7AEF\u5BFC\u822A\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E");
+  }
+  return {
+    data: payload.data,
+    updatedAt: typeof payload.updatedAt === "number" && Number.isFinite(payload.updatedAt) ? payload.updatedAt : Date.now()
+  };
+}
+async function readLocalState(config) {
+  if (!config.state) {
+    throw new SyncError(503, "local_storage_unavailable", "\u672C\u673A\u670D\u52A1\u7AEF\u5B58\u50A8\u5C1A\u672A\u914D\u7F6E");
+  }
+  let stored;
+  try {
+    stored = await config.state.getState();
+  } catch {
+    throw new SyncError(503, "local_storage_unavailable", "\u8BFB\u53D6\u672C\u673A\u670D\u52A1\u7AEF\u6570\u636E\u5931\u8D25");
+  }
+  if (!stored) return null;
+  if (!isSyncData(stored.data)) {
+    throw new SyncError(500, "local_bad_state", "\u672C\u673A\u670D\u52A1\u7AEF\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E");
+  }
+  return { data: stored.data, updatedAt: stored.updatedAt };
+}
+function decodeDataUrl(value) {
+  if (!value.startsWith("data:")) return null;
+  const comma = value.indexOf(",");
+  if (comma < 0) return null;
+  const meta = value.slice(5, comma);
+  const payload = value.slice(comma + 1);
+  const mime = meta.match(/^([^;]+)/)?.[1] || "application/octet-stream";
+  try {
+    if (/;base64/i.test(meta)) {
+      const binary = atob(payload);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+      return { bytes, contentType: mime };
+    }
+    return {
+      bytes: new TextEncoder().encode(decodeURIComponent(payload)),
+      contentType: mime
+    };
+  } catch {
+    return null;
+  }
+}
+async function fetchAssetBytes(options, url, maxBytes) {
+  const response = await remoteFetch(options, url, { headers: { accept: "image/*" } }, ASSET_TIMEOUT_MS);
+  if (!response.ok) {
+    throw new SyncError(
+      response.status === 404 ? 404 : 502,
+      "remote_asset_failed",
+      `\u8BFB\u53D6\u8FDC\u7AEF\u56FE\u7247\u5931\u8D25\uFF08${response.status}\uFF09`
+    );
+  }
+  const bytes = await readResponseBytes(response, maxBytes);
+  return {
+    bytes,
+    contentType: normalizeContentType(response.headers.get("content-type") || "", url)
+  };
+}
+async function readLocalAssetBytes(config, asset, options) {
+  if (config.assets && asset.remoteKey) {
+    const keys = [.../* @__PURE__ */ new Set([asset.remoteKey, stripAssetPrefix(asset.remoteKey)])];
+    for (const key of keys) {
+      try {
+        const stored = await config.assets.getAsset(key);
+        if (stored) {
+          return {
+            bytes: stored.bytes,
+            contentType: normalizeContentType(stored.contentType, key)
+          };
+        }
+      } catch {
+      }
+    }
+  }
+  const decoded = decodeDataUrl(asset.dataUrl);
+  if (decoded) return decoded;
+  const url = absoluteUrl(asset.dataUrl, options.localOrigin ?? "");
+  if (/^https?:\/\//i.test(url)) {
+    const max = config.assetMaxBytes ?? DEFAULT_ASSET_MAX_BYTES;
+    return await fetchAssetBytes(options, url, max);
+  }
+  throw new SyncError(404, "asset_missing", "\u672C\u673A\u7F3A\u5C11\u56FE\u7247\u5BF9\u8C61");
+}
+async function readRemoteAssetBytes(options, remote, asset, maxBytes) {
+  const decoded = decodeDataUrl(asset.dataUrl);
+  if (decoded) return decoded;
+  const candidates = [];
+  if (/^https?:\/\//i.test(asset.dataUrl)) candidates.push(asset.dataUrl);
+  if (asset.remoteKey) {
+    candidates.push(`${remote.base}/api/assets/${encodeURIComponent(asset.remoteKey)}`);
+  }
+  if (asset.dataUrl) {
+    const resolved = absoluteUrl(asset.dataUrl, remote.base);
+    if (/^https?:\/\//i.test(resolved) && !candidates.includes(resolved)) {
+      candidates.push(resolved);
+    }
+  }
+  let lastError = null;
+  for (const url of candidates) {
+    try {
+      return await fetchAssetBytes(options, url, maxBytes);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError instanceof SyncError) throw lastError;
+  throw new SyncError(404, "remote_asset_missing", "\u8FDC\u7AEF\u7F3A\u5C11\u56FE\u7247\u5BF9\u8C61");
+}
+async function uploadRemoteAsset(options, remote, key, bytes, contentType) {
+  const response = await remoteFetch(
+    options,
+    `${remote.base}/api/assets/${encodeURIComponent(key)}`,
+    {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${remote.token}`,
+        "content-type": contentType
+      },
+      body: bytes
+    },
+    ASSET_TIMEOUT_MS
+  );
+  if (response.status === 404 || response.status === 405) {
+    const form = new FormData();
+    form.append("file", new Blob([bytes], { type: contentType }), key);
+    const fallback = await remoteFetch(
+      options,
+      `${remote.base}/api/assets`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${remote.token}` },
+        body: form
+      },
+      ASSET_TIMEOUT_MS
+    );
+    if (!fallback.ok) {
+      throw new SyncError(
+        502,
+        "remote_asset_upload_failed",
+        `\u4E0A\u4F20\u8FDC\u7AEF\u56FE\u7247\u5931\u8D25\uFF1A${await readRemoteError(fallback)}`
+      );
+    }
+    const uploaded2 = await readResponseJson(fallback);
+    if (typeof uploaded2.key !== "string" || typeof uploaded2.url !== "string") {
+      throw new SyncError(502, "remote_asset_upload_failed", "\u8FDC\u7AEF\u6CA1\u6709\u8FD4\u56DE\u56FE\u7247\u5730\u5740");
+    }
+    return { key: uploaded2.key, url: uploaded2.url };
+  }
+  if (!response.ok) {
+    throw new SyncError(
+      502,
+      "remote_asset_upload_failed",
+      `\u4E0A\u4F20\u8FDC\u7AEF\u56FE\u7247\u5931\u8D25\uFF1A${await readRemoteError(response)}`
+    );
+  }
+  const uploaded = await readResponseJson(response);
+  if (typeof uploaded.key !== "string" || typeof uploaded.url !== "string") {
+    throw new SyncError(502, "remote_asset_upload_failed", "\u8FDC\u7AEF\u6CA1\u6709\u8FD4\u56DE\u56FE\u7247\u5730\u5740");
+  }
+  return { key: uploaded.key, url: uploaded.url };
+}
+function assetReference(asset) {
+  return Boolean(asset && (asset.dataUrl || asset.remoteKey));
+}
+function addWarning(summary, message) {
+  if (summary.warnings.length < MAX_WARNINGS) summary.warnings.push(message);
+}
+async function localAssetExists(config, asset) {
+  if (!config.assets) return false;
+  const keys = asset.remoteKey ? [.../* @__PURE__ */ new Set([asset.remoteKey, stripAssetPrefix(asset.remoteKey)])] : [];
+  for (const key of keys) {
+    try {
+      if (await config.assets.getAsset(key)) return true;
+    } catch {
+    }
+  }
+  if (asset.dataUrl.startsWith("data:")) return true;
+  if (config.assets.kind === "blob" && /^https?:\/\//i.test(asset.dataUrl)) return true;
+  return false;
+}
+async function syncAssetsForUpload(config, localData, remoteState, remote, options, includeAssets, targetData) {
+  const summary = {
+    enabled: includeAssets,
+    total: localData.gallery.length,
+    transferred: 0,
+    existing: 0,
+    failed: 0,
+    warnings: []
+  };
+  const remoteById = new Map(
+    (remoteState?.data.gallery ?? []).filter((asset) => asset && asset.id).map((asset) => [asset.id, asset])
+  );
+  const usedKeys = /* @__PURE__ */ new Set();
+  const maxBytes = remoteSummary(remote.health).limits?.assetBytes ?? DEFAULT_ASSET_MAX_BYTES;
+  const gallery = [];
+  for (const sourceAsset of localData.gallery) {
+    const remoteAsset = remoteById.get(sourceAsset.id);
+    if (assetReference(remoteAsset)) {
+      gallery.push({
+        ...sourceAsset,
+        dataUrl: remoteAsset.dataUrl,
+        remoteKey: remoteAsset.remoteKey
+      });
+      summary.existing += 1;
+      continue;
+    }
+    if (!includeAssets || !config.assets) {
+      gallery.push({
+        ...sourceAsset,
+        dataUrl: absoluteUrl(sourceAsset.dataUrl, options.localOrigin ?? "")
+      });
+      continue;
+    }
+    try {
+      const local = await readLocalAssetBytes(config, sourceAsset, options);
+      if (local.bytes.byteLength > maxBytes) {
+        throw new SyncError(413, "asset_too_large", "\u56FE\u7247\u8D85\u8FC7\u8FDC\u7AEF\u5927\u5C0F\u9650\u5236");
+      }
+      const key = pickAssetKey(sourceAsset, local.contentType, usedKeys);
+      const uploaded = await uploadRemoteAsset(
+        options,
+        remote,
+        key,
+        local.bytes,
+        local.contentType
+      );
+      gallery.push({
+        ...sourceAsset,
+        dataUrl: uploaded.url,
+        remoteKey: uploaded.key
+      });
+      summary.transferred += 1;
+    } catch (error) {
+      summary.failed += 1;
+      const reason = error instanceof Error ? error.message : "\u672A\u77E5\u9519\u8BEF";
+      addWarning(summary, `\u56FE\u7247\u300C${sourceAsset.name || sourceAsset.id}\u300D\u4E0A\u4F20\u5931\u8D25\uFF1A${reason}`);
+      gallery.push({
+        ...sourceAsset,
+        dataUrl: absoluteUrl(sourceAsset.dataUrl, options.localOrigin ?? "")
+      });
+    }
+  }
+  targetData.gallery = gallery;
+  return summary;
+}
+async function syncAssetsForDownload(config, localState, remoteData, remote, options, includeAssets, targetData) {
+  const summary = {
+    enabled: includeAssets,
+    total: remoteData.gallery.length,
+    transferred: 0,
+    existing: 0,
+    failed: 0,
+    warnings: []
+  };
+  const localById = new Map(
+    (localState?.data.gallery ?? []).filter((asset) => asset && asset.id).map((asset) => [asset.id, asset])
+  );
+  const usedKeys = /* @__PURE__ */ new Set();
+  const maxBytes = config.assetMaxBytes ?? DEFAULT_ASSET_MAX_BYTES;
+  const gallery = [];
+  for (const sourceAsset of remoteData.gallery) {
+    const localAsset = localById.get(sourceAsset.id);
+    if (localAsset && await localAssetExists(config, localAsset)) {
+      gallery.push({
+        ...sourceAsset,
+        dataUrl: localAsset.dataUrl,
+        remoteKey: localAsset.remoteKey
+      });
+      summary.existing += 1;
+      continue;
+    }
+    if (!includeAssets || !config.assets) {
+      gallery.push({
+        ...sourceAsset,
+        dataUrl: absoluteUrl(sourceAsset.dataUrl, remote.origin)
+      });
+      continue;
+    }
+    try {
+      const original = await readRemoteAssetBytes(options, remote, sourceAsset, maxBytes);
+      if (original.bytes.byteLength > maxBytes) {
+        throw new SyncError(413, "asset_too_large", "\u56FE\u7247\u8D85\u8FC7\u672C\u673A\u5927\u5C0F\u9650\u5236");
+      }
+      const key = pickAssetKey(sourceAsset, original.contentType, usedKeys);
+      const stored = await config.assets.putAsset(key, original.bytes, original.contentType);
+      gallery.push({
+        ...sourceAsset,
+        dataUrl: stored.url,
+        remoteKey: stored.key
+      });
+      summary.transferred += 1;
+    } catch (error) {
+      summary.failed += 1;
+      const reason = error instanceof Error ? error.message : "\u672A\u77E5\u9519\u8BEF";
+      addWarning(summary, `\u56FE\u7247\u300C${sourceAsset.name || sourceAsset.id}\u300D\u4E0B\u8F7D\u5931\u8D25\uFF1A${reason}`);
+      gallery.push({
+        ...sourceAsset,
+        dataUrl: absoluteUrl(sourceAsset.dataUrl, remote.origin)
+      });
+    }
+  }
+  targetData.gallery = gallery;
+  return summary;
+}
+async function pushRemoteState(options, remote, data) {
+  const serialized = JSON.stringify({ data });
+  const max = remoteSummary(remote.health).limits?.stateBytes ?? DEFAULT_STATE_MAX_BYTES;
+  if (serialized.length > max) {
+    throw new SyncError(413, "state_too_large", "\u5BFC\u822A\u6570\u636E\u8D85\u8FC7\u8FDC\u7AEF\u5927\u5C0F\u9650\u5236");
+  }
+  const response = await remoteFetch(options, `${remote.base}/api/state`, {
+    method: "PUT",
+    headers: {
+      authorization: `Bearer ${remote.token}`,
+      "content-type": "application/json"
+    },
+    body: serialized
+  });
+  if (!response.ok) {
+    throw new SyncError(
+      502,
+      "remote_save_failed",
+      `\u4FDD\u5B58\u5230\u8FDC\u7AEF\u5931\u8D25\uFF1A${await readRemoteError(response)}`
+    );
+  }
+  const payload = await readResponseJson(response);
+  return typeof payload.updatedAt === "number" && Number.isFinite(payload.updatedAt) ? payload.updatedAt : Date.now();
+}
+function localStateLimit(config) {
+  return config.stateMaxBytes ?? DEFAULT_STATE_MAX_BYTES;
+}
+async function performSync(config, input, options = {}) {
+  const action = input.action === "test" ? "test" : "sync";
+  const mode = normalizeMode(input.mode);
+  const includeAssets = input.includeAssets !== false;
+  const remoteUrl = readString(input.remoteUrl);
+  const password = readString(input.password);
+  if (!remoteUrl) throw new SyncError(400, "remote_url_required", "\u8BF7\u8F93\u5165\u8FDC\u7AEF\u5730\u5740");
+  if (!password) throw new SyncError(400, "password_required", "\u8BF7\u8F93\u5165\u8FDC\u7AEF\u7BA1\u7406\u5458\u5BC6\u7801");
+  const remote = await connectRemote(options, remoteUrl, password);
+  const remoteState = await readRemoteState(options, remote);
+  let localState = null;
+  try {
+    localState = await readLocalState(config);
+  } catch (error) {
+    if (action === "test") {
+      localState = null;
+    } else {
+      throw error;
+    }
+  }
+  const remoteInfo = remoteSummary(remote.health);
+  const localUpdatedAt = localState?.updatedAt ?? null;
+  const remoteUpdatedAt = remoteState?.updatedAt ?? null;
+  if (action === "test") {
+    return {
+      ok: true,
+      action,
+      mode,
+      direction: "none",
+      localUpdatedAt,
+      remoteUpdatedAt,
+      updatedAt: null,
+      remote: remoteInfo,
+      empty: remoteState === null
+    };
+  }
+  if (!localState && !remoteState) {
+    throw new SyncError(400, "both_empty", "\u672C\u673A\u548C\u8FDC\u7AEF\u90FD\u8FD8\u6CA1\u6709\u6570\u636E\uFF0C\u8BF7\u5148\u5728\u5176\u4E2D\u4E00\u7AEF\u5B8C\u6210\u521D\u59CB\u5316");
+  }
+  let direction;
+  if (mode === "upload") {
+    if (!localState) {
+      throw new SyncError(400, "local_empty", "\u672C\u673A\u8FD8\u6CA1\u6709\u53EF\u4E0A\u4F20\u7684\u6570\u636E");
+    }
+    direction = "upload";
+  } else if (mode === "download") {
+    if (!remoteState) {
+      throw new SyncError(400, "remote_empty", "\u8FDC\u7AEF\u8FD8\u6CA1\u6709\u53EF\u4E0B\u8F7D\u7684\u6570\u636E");
+    }
+    direction = "download";
+  } else if (!localState) {
+    direction = "download";
+  } else if (!remoteState) {
+    direction = "upload";
+  } else if (comparableData(localState.data) === comparableData(remoteState.data)) {
+    direction = "none";
+  } else {
+    direction = remoteState.updatedAt > localState.updatedAt ? "download" : "upload";
+  }
+  if (direction === "none") {
+    return {
+      ok: true,
+      action,
+      mode,
+      direction,
+      localUpdatedAt,
+      remoteUpdatedAt,
+      updatedAt: null,
+      remote: remoteInfo,
+      warnings: ["\u4E24\u7AEF\u5BFC\u822A\u5185\u5BB9\u5DF2\u7ECF\u4E00\u81F4\uFF0C\u6CA1\u6709\u4F20\u8F93\u6570\u636E\u3002"]
+    };
+  }
+  if (direction === "upload") {
+    const target2 = cloneData(localState.data);
+    const assets2 = await syncAssetsForUpload(
+      config,
+      localState.data,
+      remoteState,
+      remote,
+      options,
+      includeAssets,
+      target2
+    );
+    const updatedAt2 = await pushRemoteState(options, remote, target2);
+    return {
+      ok: true,
+      action,
+      mode,
+      direction,
+      localUpdatedAt,
+      remoteUpdatedAt,
+      updatedAt: updatedAt2,
+      remote: remoteInfo,
+      assets: assets2,
+      warnings: assets2.warnings
+    };
+  }
+  const target = cloneData(remoteState.data);
+  const assets = await syncAssetsForDownload(
+    config,
+    localState,
+    remoteState.data,
+    remote,
+    options,
+    includeAssets,
+    target
+  );
+  const serialized = JSON.stringify(target);
+  if (serialized.length > localStateLimit(config)) {
+    throw new SyncError(413, "state_too_large", "\u8FDC\u7AEF\u5BFC\u822A\u6570\u636E\u8D85\u8FC7\u672C\u673A\u5927\u5C0F\u9650\u5236");
+  }
+  if (!config.state) {
+    throw new SyncError(503, "local_storage_unavailable", "\u672C\u673A\u670D\u52A1\u7AEF\u5B58\u50A8\u5C1A\u672A\u914D\u7F6E");
+  }
+  let updatedAt;
+  try {
+    updatedAt = await config.state.putState(target);
+  } catch {
+    throw new SyncError(503, "local_save_failed", "\u4FDD\u5B58\u5230\u672C\u673A\u5931\u8D25");
+  }
+  return {
+    ok: true,
+    action,
+    mode,
+    direction,
+    localUpdatedAt: updatedAt,
+    remoteUpdatedAt,
+    updatedAt,
+    remote: remoteInfo,
+    assets,
+    warnings: assets.warnings,
+    data: target
+  };
+}
+
+// server/core.ts
+var DEFAULT_STATE_MAX_BYTES2 = 8 * 1024 * 1024;
+var DEFAULT_ASSET_MAX_BYTES2 = 6 * 1024 * 1024;
 var DEFAULT_TOKEN_TTL = 7 * 24 * 60 * 60 * 1e3;
 var ALLOWED_IMAGE_TYPES = /* @__PURE__ */ new Map([
   ["image/png", "png"],
@@ -190,10 +947,10 @@ var ALLOWED_IMAGE_TYPES = /* @__PURE__ */ new Map([
   ["image/vnd.microsoft.icon", "ico"]
 ]);
 var encoder = new TextEncoder();
-async function readJsonLimited(request, maxBytes) {
+async function readBytesLimited(request, maxBytes) {
   const declared = Number(request.headers.get("content-length") || "0");
   if (declared > maxBytes) return { ok: false, tooLarge: true };
-  if (!request.body) return { ok: true, value: null };
+  if (!request.body) return { ok: true, value: new Uint8Array(0) };
   const reader = request.body.getReader();
   const chunks = [];
   let total = 0;
@@ -218,13 +975,18 @@ async function readJsonLimited(request, maxBytes) {
     merged.set(chunk, offset);
     offset += chunk.byteLength;
   }
+  return { ok: true, value: merged };
+}
+async function readJsonLimited(request, maxBytes) {
+  const parsed = await readBytesLimited(request, maxBytes);
+  if (!parsed.ok) return parsed;
   try {
-    return { ok: true, value: JSON.parse(new TextDecoder().decode(merged)) };
+    return { ok: true, value: JSON.parse(new TextDecoder().decode(parsed.value)) };
   } catch {
     return { ok: false, tooLarge: false };
   }
 }
-function isRecord2(value) {
+function isRecord3(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function json(status, body, headers = {}) {
@@ -320,7 +1082,7 @@ async function requireAuth(request, config) {
   return null;
 }
 function isAppData(value) {
-  if (!isRecord2(value) || !isRecord2(value.config)) return false;
+  if (!isRecord3(value) || !isRecord3(value.config)) return false;
   return ["groups", "items", "searchEngines", "gallery"].every(
     (key) => Array.isArray(value[key])
   );
@@ -332,7 +1094,7 @@ function sanitizeState(value) {
   delete config.announcementText;
   config.defaultOpenMode = config.defaultOpenMode === "self" ? "self" : "new";
   const items = value.items.map((item) => {
-    if (!isRecord2(item)) return item;
+    if (!isRecord3(item)) return item;
     const next = { ...item };
     delete next.windowWidth;
     delete next.windowHeight;
@@ -366,17 +1128,17 @@ function publicState(data, options = {}) {
   const groups = Array.isArray(state.groups) ? state.groups : [];
   const items = Array.isArray(state.items) ? state.items : [];
   const visibleGroups = groups.filter(
-    (group) => isRecord2(group) && !group.hidden
+    (group) => isRecord3(group) && !group.hidden
   );
   const visibleGroupIds = new Set(
-    visibleGroups.map((group) => isRecord2(group) && typeof group.id === "string" ? group.id : null).filter((id) => Boolean(id))
+    visibleGroups.map((group) => isRecord3(group) && typeof group.id === "string" ? group.id : null).filter((id) => Boolean(id))
   );
   return {
     ...state,
     config: publicConfig,
     groups: visibleGroups,
     items: items.filter(
-      (item) => isRecord2(item) && !item.hidden && typeof item.groupId === "string" && visibleGroupIds.has(item.groupId)
+      (item) => isRecord3(item) && !item.hidden && typeof item.groupId === "string" && visibleGroupIds.has(item.groupId)
     )
   };
 }
@@ -424,7 +1186,7 @@ function assetKey(value) {
   }
   return /^[a-zA-Z0-9._/-]+$/.test(key) ? key : null;
 }
-function contentTypeFromKey(key) {
+function contentTypeFromKey2(key) {
   const extension = key.split(".").pop()?.toLowerCase() ?? "";
   const map = {
     png: "image/png",
@@ -449,8 +1211,8 @@ function healthBody(config, ok, storageError) {
     assets: config.assets?.kind ?? null,
     auth: Boolean(config.adminPassword),
     limits: {
-      stateBytes: config.stateMaxBytes ?? DEFAULT_STATE_MAX_BYTES,
-      assetBytes: config.assetMaxBytes ?? DEFAULT_ASSET_MAX_BYTES
+      stateBytes: config.stateMaxBytes ?? DEFAULT_STATE_MAX_BYTES2,
+      assetBytes: config.assetMaxBytes ?? DEFAULT_ASSET_MAX_BYTES2
     },
     ...storageError ? { storageError } : {}
   };
@@ -524,6 +1286,30 @@ async function handleSessionRefresh(request, config) {
   const session = await createToken(config);
   return json(200, session);
 }
+async function handleSync(request, config, url) {
+  if (request.method !== "POST") return json(405, { error: "method_not_allowed" });
+  const unauthorized = await requireAuth(request, config);
+  if (unauthorized) return unauthorized;
+  const parsed = await readJsonLimited(request, 64 * 1024);
+  if (!parsed.ok) {
+    return parsed.tooLarge ? json(413, { error: "too_large", message: "\u540C\u6B65\u8BF7\u6C42\u5185\u5BB9\u8FC7\u5927" }) : json(400, { error: "bad_request", message: "\u540C\u6B65\u8BF7\u6C42\u683C\u5F0F\u4E0D\u6B63\u786E" });
+  }
+  if (!isRecord3(parsed.value)) {
+    return json(400, { error: "bad_request", message: "\u540C\u6B65\u8BF7\u6C42\u683C\u5F0F\u4E0D\u6B63\u786E" });
+  }
+  try {
+    const result = await performSync(config, parsed.value, {
+      localOrigin: url.origin,
+      fetchImpl: config.syncFetch
+    });
+    return json(200, result);
+  } catch (error) {
+    if (error instanceof SyncError) {
+      return json(error.status, { error: error.code, message: error.message });
+    }
+    throw error;
+  }
+}
 async function handleState(request, config, url) {
   if (!config.state) {
     return json(503, { error: "not_configured", message: "\u4E91\u7AEF\u5B58\u50A8\u5C1A\u672A\u914D\u7F6E" });
@@ -546,7 +1332,7 @@ async function handleState(request, config, url) {
       if (!data2) return json(500, { error: "invalid_state", message: "\u670D\u52A1\u7AEF\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E" });
       return json(200, { data: data2, updatedAt: stored.updatedAt });
     }
-    const storedConfig = isRecord2(stored.data) && isRecord2(stored.data.config) ? stored.data.config : null;
+    const storedConfig = isRecord3(stored.data) && isRecord3(stored.data.config) ? stored.data.config : null;
     const locked = storedConfig?.publicAccess === false;
     const data = publicState(stored.data, { locked });
     if (!data) return json(500, { error: "invalid_state", message: "\u670D\u52A1\u7AEF\u6570\u636E\u683C\u5F0F\u4E0D\u6B63\u786E" });
@@ -555,7 +1341,7 @@ async function handleState(request, config, url) {
   if (request.method === "PUT") {
     const unauthorized = await requireAuth(request, config);
     if (unauthorized) return unauthorized;
-    const max = config.stateMaxBytes ?? DEFAULT_STATE_MAX_BYTES;
+    const max = config.stateMaxBytes ?? DEFAULT_STATE_MAX_BYTES2;
     const parsed = await readJsonLimited(request, max);
     if (!parsed.ok) {
       return parsed.tooLarge ? json(413, { error: "too_large", message: "\u5BFC\u822A\u6570\u636E\u8D85\u8FC7\u5927\u5C0F\u9650\u5236" }) : json(400, { error: "bad_request", message: "\u8BF7\u6C42\u683C\u5F0F\u4E0D\u6B63\u786E" });
@@ -577,6 +1363,64 @@ async function handleState(request, config, url) {
     }
   }
   return json(405, { error: "method_not_allowed" });
+}
+async function handleBingWallpaper(request, config, url) {
+  if (request.method !== "GET") return json(405, { error: "method_not_allowed" });
+  const DEFAULT_ENDPOINT = "https://api.bimg.cc/today";
+  const requested = url.searchParams.get("url")?.trim() ?? "";
+  let endpoint = DEFAULT_ENDPOINT;
+  if (requested) {
+    let parsed;
+    try {
+      parsed = new URL(requested);
+    } catch {
+      return json(400, { error: "bad_url", message: "\u58C1\u7EB8\u63A5\u53E3\u5730\u5740\u683C\u5F0F\u4E0D\u6B63\u786E" });
+    }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return json(400, { error: "bad_url", message: "\u58C1\u7EB8\u63A5\u53E3\u5730\u5740\u53EA\u652F\u6301 http \u6216 https" });
+    }
+    endpoint = parsed.toString();
+  }
+  const fetcher = config.syncFetch ?? fetch;
+  let upstream;
+  try {
+    upstream = await fetcher(endpoint, {
+      redirect: "follow",
+      headers: { accept: "application/json", "user-agent": "hares-panel/1" },
+      signal: AbortSignal.timeout(15e3)
+    });
+  } catch {
+    return json(502, { error: "upstream_unreachable", message: "\u65E0\u6CD5\u8FDE\u63A5\u5FC5\u5E94\u58C1\u7EB8\u63A5\u53E3" });
+  }
+  if (!upstream.ok) {
+    return json(502, {
+      error: "upstream_failed",
+      message: `\u5FC5\u5E94\u58C1\u7EB8\u63A5\u53E3\u8FD4\u56DE ${upstream.status}`
+    });
+  }
+  const contentType = (upstream.headers.get("content-type") ?? "").toLowerCase();
+  if (!contentType.includes("json")) {
+    return json(200, { url: upstream.url }, { "cache-control": "public, max-age=1800" });
+  }
+  let payload;
+  try {
+    payload = await upstream.json();
+  } catch {
+    return json(502, { error: "upstream_bad_json", message: "\u5FC5\u5E94\u58C1\u7EB8\u63A5\u53E3\u8FD4\u56DE\u4E86\u65E0\u6CD5\u8BC6\u522B\u7684\u6570\u636E" });
+  }
+  let imageUrl = "";
+  if (isRecord3(payload) && typeof payload.url === "string") {
+    imageUrl = payload.url;
+  } else if (isRecord3(payload) && Array.isArray(payload.data) && payload.data.length > 0) {
+    const first = payload.data[0];
+    imageUrl = isRecord3(first) && typeof first.url === "string" ? first.url : "";
+  } else if (typeof payload === "string") {
+    imageUrl = payload;
+  }
+  if (!/^https?:\/\//i.test(imageUrl)) {
+    return json(502, { error: "upstream_no_image", message: "\u5FC5\u5E94\u58C1\u7EB8\u63A5\u53E3\u6CA1\u6709\u8FD4\u56DE\u56FE\u7247\u5730\u5740" });
+  }
+  return json(200, { url: imageUrl }, { "cache-control": "public, max-age=1800" });
 }
 async function handleAssets(request, config, url) {
   if (!config.assets) {
@@ -602,7 +1446,7 @@ async function handleAssets(request, config, url) {
     if (!extension) {
       return json(415, { error: "unsupported_type", message: "\u4EC5\u652F\u6301 PNG / JPEG / WebP / GIF / SVG / AVIF / ICO" });
     }
-    const max = config.assetMaxBytes ?? DEFAULT_ASSET_MAX_BYTES;
+    const max = config.assetMaxBytes ?? DEFAULT_ASSET_MAX_BYTES2;
     if (file.size > max) {
       return json(413, { error: "too_large", message: `\u56FE\u7247\u4E0D\u80FD\u8D85\u8FC7 ${Math.round(max / 1024 / 1024)} MB` });
     }
@@ -627,13 +1471,46 @@ async function handleAssets(request, config, url) {
       return new Response(request.method === "HEAD" ? null : asset.bytes, {
         status: 200,
         headers: {
-          "content-type": asset.contentType || contentTypeFromKey(key),
+          "content-type": asset.contentType || contentTypeFromKey2(key),
           "content-length": String(asset.bytes.byteLength),
           "cache-control": "public, max-age=31536000, immutable"
         }
       });
     } catch {
       return json(503, { error: "asset_store_unavailable" });
+    }
+  }
+  if (request.method === "PUT") {
+    const unauthorized = await requireAuth(request, config);
+    if (unauthorized) return unauthorized;
+    const contentType = (request.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+      return json(415, {
+        error: "unsupported_type",
+        message: "\u4EC5\u652F\u6301 PNG / JPEG / WebP / GIF / SVG / AVIF / ICO"
+      });
+    }
+    const max = config.assetMaxBytes ?? DEFAULT_ASSET_MAX_BYTES2;
+    const parsed = await readBytesLimited(request, max);
+    if (!parsed.ok) {
+      return json(413, {
+        error: "too_large",
+        message: `\u56FE\u7247\u4E0D\u80FD\u8D85\u8FC7 ${Math.round(max / 1024 / 1024)} MB`
+      });
+    }
+    if (parsed.value.byteLength === 0) {
+      return json(400, { error: "bad_request", message: "\u56FE\u7247\u5185\u5BB9\u4E3A\u7A7A" });
+    }
+    try {
+      const stored = await config.assets.putAsset(key, parsed.value, contentType);
+      return json(201, {
+        key: stored.key,
+        url: stored.url,
+        size: parsed.value.byteLength,
+        contentType
+      });
+    } catch {
+      return json(503, { error: "asset_store_unavailable", message: "\u4E0A\u4F20\u56FE\u7247\u5931\u8D25" });
     }
   }
   if (request.method === "DELETE") {
@@ -674,6 +1551,12 @@ async function handleApi(request, config) {
     if (path === "/api/session/refresh") {
       if (request.method !== "POST") return json(405, { error: "method_not_allowed" });
       return await handleSessionRefresh(request, config);
+    }
+    if (path === "/api/sync") {
+      return await handleSync(request, config, url);
+    }
+    if (path === "/api/wallpaper/bing") {
+      return await handleBingWallpaper(request, config, url);
     }
     if (path === "/api/state") {
       return await handleState(request, config, url);

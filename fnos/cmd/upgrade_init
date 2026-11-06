@@ -1,1 +1,3 @@
-#!/bin/bash`n# Called before upgrade. Data lives in the persistent app var directory.`nexit 0`n
+#!/bin/bash
+# Called before upgrade. Data lives in the persistent app var directory.
+exit 0

@@ -1,1 +1,14 @@
-#!/bin/bash`n# Called after uninstall.`nexit 0`n
+#!/bin/bash
+# Called after uninstall.
+# Respect the user's choice from the uninstall wizard (wizard/uninstall).
+# Data is preserved by default; it is only removed when the user explicitly
+# chose "delete" in the wizard.
+case "${wizard_keep_data:-keep}" in
+  delete)
+    rm -rf "${TRIM_PKGVAR}/data"
+    ;;
+  *)
+    # default: keep the persistent app data directory
+    ;;
+esac
+exit 0

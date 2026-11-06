@@ -8,6 +8,7 @@ export type SettingsTab =
   | 'content'
   | 'media'
   | 'cloud'
+  | 'sync'
   | 'backup'
   | 'about'
 

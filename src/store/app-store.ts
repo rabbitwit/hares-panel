@@ -96,6 +96,15 @@ function normalizeConfig(config: SiteConfig): SiteConfig {
     ...config,
     adminName: config.adminName?.trim() || '管理员',
     adminAvatar: config.adminAvatar || '',
+    showLogoMark: config.showLogoMark !== false,
+    bingWallpaperUrl: config.bingWallpaperUrl?.trim() || 'https://api.bimg.cc/today',
+    iconRadiusEnabled: config.iconRadiusEnabled !== false,
+    iconRadius:
+      typeof config.iconRadius === 'number' && Number.isFinite(config.iconRadius)
+        ? config.iconRadius
+        : 16,
+    glowEffect: config.glowEffect !== false,
+    glassEffect: config.glassEffect === true,
     defaultOpenMode: normalizeOpenMode(config.defaultOpenMode as string),
   }
 }

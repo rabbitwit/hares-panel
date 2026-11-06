@@ -79,6 +79,7 @@ function blobAssetStore(token: string): AssetStore {
         token,
         contentType,
         addRandomSuffix: false,
+        allowOverwrite: true,
         cacheControlMaxAge: 365 * 24 * 60 * 60,
       })
       return { key: blob.pathname, url: blob.url }

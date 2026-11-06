@@ -1,1 +1,3 @@
-#!/bin/bash`n# Called after the app settings page is submitted.`nexit 0`n
+#!/bin/bash
+# Called after the app settings page is submitted.
+exit 0

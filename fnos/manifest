@@ -1,5 +1,5 @@
 appname=hares-panel
-version=0.1.0
+version=0.1.2
 display_name=Hares-Panel
 desc=面向 NAS、家庭服务器和云主机的导航首页：内外网地址切换、图标库、壁纸、备份恢复，数据保存在应用数据目录内。
 source=thirdparty

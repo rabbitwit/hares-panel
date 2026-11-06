@@ -10,6 +10,7 @@ import {
   normalizeVersion,
   type LatestRelease,
 } from './update'
+import { performSync, SyncError } from './sync'
 
 export interface StoredState {
   data: unknown
@@ -52,6 +53,8 @@ export interface ApiConfig {
   platform?: string
   /** Injectable version lookup for tests and private mirrors. */
   updateChecker?: (options: { force?: boolean }) => Promise<LatestRelease>
+  /** Injectable fetch for cross-instance sync tests. */
+  syncFetch?: typeof fetch
 }
 
 const DEFAULT_STATE_MAX_BYTES = 8 * 1024 * 1024
@@ -70,13 +73,13 @@ const ALLOWED_IMAGE_TYPES = new Map<string, string>([
 
 const encoder = new TextEncoder()
 
-async function readJsonLimited(
+async function readBytesLimited(
   request: Request,
   maxBytes: number,
-): Promise<{ ok: true; value: unknown } | { ok: false; tooLarge: boolean }> {
+): Promise<{ ok: true; value: Uint8Array<ArrayBuffer> } | { ok: false; tooLarge: boolean }> {
   const declared = Number(request.headers.get('content-length') || '0')
   if (declared > maxBytes) return { ok: false, tooLarge: true }
-  if (!request.body) return { ok: true, value: null }
+  if (!request.body) return { ok: true, value: new Uint8Array(0) }
   const reader = request.body.getReader()
   const chunks: Uint8Array[] = []
   let total = 0
@@ -101,8 +104,17 @@ async function readJsonLimited(
     merged.set(chunk, offset)
     offset += chunk.byteLength
   }
+  return { ok: true, value: merged }
+}
+
+async function readJsonLimited(
+  request: Request,
+  maxBytes: number,
+): Promise<{ ok: true; value: unknown } | { ok: false; tooLarge: boolean }> {
+  const parsed = await readBytesLimited(request, maxBytes)
+  if (!parsed.ok) return parsed
   try {
-    return { ok: true, value: JSON.parse(new TextDecoder().decode(merged)) }
+    return { ok: true, value: JSON.parse(new TextDecoder().decode(parsed.value)) }
   } catch {
     return { ok: false, tooLarge: false }
   }
@@ -472,6 +484,35 @@ async function handleSessionRefresh(request: Request, config: ApiConfig): Promis
   return json(200, session)
 }
 
+async function handleSync(request: Request, config: ApiConfig, url: URL): Promise<Response> {
+  if (request.method !== 'POST') return json(405, { error: 'method_not_allowed' })
+  const unauthorized = await requireAuth(request, config)
+  if (unauthorized) return unauthorized
+
+  const parsed = await readJsonLimited(request, 64 * 1024)
+  if (!parsed.ok) {
+    return parsed.tooLarge
+      ? json(413, { error: 'too_large', message: '同步请求内容过大' })
+      : json(400, { error: 'bad_request', message: '同步请求格式不正确' })
+  }
+  if (!isRecord(parsed.value)) {
+    return json(400, { error: 'bad_request', message: '同步请求格式不正确' })
+  }
+
+  try {
+    const result = await performSync(config, parsed.value, {
+      localOrigin: url.origin,
+      fetchImpl: config.syncFetch,
+    })
+    return json(200, result)
+  } catch (error) {
+    if (error instanceof SyncError) {
+      return json(error.status, { error: error.code, message: error.message })
+    }
+    throw error
+  }
+}
+
 async function handleState(request: Request, config: ApiConfig, url: URL): Promise<Response> {
   if (!config.state) {
     return json(503, { error: 'not_configured', message: '云端存储尚未配置' })
@@ -529,6 +570,101 @@ async function handleState(request: Request, config: ApiConfig, url: URL): Promi
   }
 
   return json(405, { error: 'method_not_allowed' })
+}
+
+/**
+ * Proxy for the Bing daily wallpaper API.
+ *
+ * Browsers cannot call the upstream Bing APIs directly in development because
+ * they do not send `Access-Control-Allow-Origin`, so a cross-origin `fetch()`
+ * is rejected. Proxying through our own origin removes the CORS check entirely
+ * and keeps every deployment (Docker, Workers, Vercel, EdgeOne) on the same
+ * code path.
+ *
+ * Any HTTP(S) endpoint the administrator configures is accepted, so self-hosted
+ * Bing wallpaper services work too. The upstream JSON is read and reduced to a
+ * single image URL (never the raw content), so the endpoint stays a narrow
+ * wallpaper proxy rather than a general-purpose open relay.
+ */
+async function handleBingWallpaper(
+  request: Request,
+  config: ApiConfig,
+  url: URL,
+): Promise<Response> {
+  if (request.method !== 'GET') return json(405, { error: 'method_not_allowed' })
+
+  const DEFAULT_ENDPOINT = 'https://api.bimg.cc/today'
+
+  const requested = url.searchParams.get('url')?.trim() ?? ''
+  let endpoint = DEFAULT_ENDPOINT
+  if (requested) {
+    let parsed: URL
+    try {
+      parsed = new URL(requested)
+    } catch {
+      return json(400, { error: 'bad_url', message: '壁纸接口地址格式不正确' })
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return json(400, { error: 'bad_url', message: '壁纸接口地址只支持 http 或 https' })
+    }
+    endpoint = parsed.toString()
+  }
+
+  const fetcher = config.syncFetch ?? fetch
+  let upstream: Response
+  try {
+    upstream = await fetcher(endpoint, {
+      redirect: 'follow',
+      headers: { accept: 'application/json', 'user-agent': 'hares-panel/1' },
+      signal: AbortSignal.timeout(15_000),
+    })
+  } catch {
+    return json(502, { error: 'upstream_unreachable', message: '无法连接必应壁纸接口' })
+  }
+
+  if (!upstream.ok) {
+    return json(502, {
+      error: 'upstream_failed',
+      message: `必应壁纸接口返回 ${upstream.status}`,
+    })
+  }
+
+  const contentType = (upstream.headers.get('content-type') ?? '').toLowerCase()
+  if (!contentType.includes('json')) {
+    // `format=jpg` style responses redirect straight to the image; the final URL
+    // is what callers want.
+    return json(200, { url: upstream.url }, { 'cache-control': 'public, max-age=1800' })
+  }
+
+  let payload: unknown
+  try {
+    payload = await upstream.json()
+  } catch {
+    return json(502, { error: 'upstream_bad_json', message: '必应壁纸接口返回了无法识别的数据' })
+  }
+
+  let imageUrl = ''
+  if (isRecord(payload) && typeof payload.url === 'string') {
+    // bing.xinac.net returns { url: "https://..." }.
+    imageUrl = payload.url
+  } else if (
+    isRecord(payload) &&
+    Array.isArray(payload.data) &&
+    payload.data.length > 0
+  ) {
+    // api.bimg.cc returns { code, msg, data: [{ url: "https://..." }, ...] }.
+    const first = payload.data[0]
+    imageUrl = isRecord(first) && typeof first.url === 'string' ? first.url : ''
+  } else if (typeof payload === 'string') {
+    // Some providers reply with the bare URL as a string.
+    imageUrl = payload
+  }
+  if (!/^https?:\/\//i.test(imageUrl)) {
+    return json(502, { error: 'upstream_no_image', message: '必应壁纸接口没有返回图片地址' })
+  }
+
+  // Bing rotates the image once per day; half an hour of caching is plenty.
+  return json(200, { url: imageUrl }, { 'cache-control': 'public, max-age=1800' })
 }
 
 async function handleAssets(request: Request, config: ApiConfig, url: URL): Promise<Response> {
@@ -594,6 +730,43 @@ async function handleAssets(request: Request, config: ApiConfig, url: URL): Prom
     }
   }
 
+  if (request.method === 'PUT') {
+    const unauthorized = await requireAuth(request, config)
+    if (unauthorized) return unauthorized
+    const contentType = (request.headers.get('content-type') || '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase()
+    if (!ALLOWED_IMAGE_TYPES.has(contentType)) {
+      return json(415, {
+        error: 'unsupported_type',
+        message: '仅支持 PNG / JPEG / WebP / GIF / SVG / AVIF / ICO',
+      })
+    }
+    const max = config.assetMaxBytes ?? DEFAULT_ASSET_MAX_BYTES
+    const parsed = await readBytesLimited(request, max)
+    if (!parsed.ok) {
+      return json(413, {
+        error: 'too_large',
+        message: `图片不能超过 ${Math.round(max / 1024 / 1024)} MB`,
+      })
+    }
+    if (parsed.value.byteLength === 0) {
+      return json(400, { error: 'bad_request', message: '图片内容为空' })
+    }
+    try {
+      const stored = await config.assets.putAsset(key, parsed.value, contentType)
+      return json(201, {
+        key: stored.key,
+        url: stored.url,
+        size: parsed.value.byteLength,
+        contentType,
+      })
+    } catch {
+      return json(503, { error: 'asset_store_unavailable', message: '上传图片失败' })
+    }
+  }
+
   if (request.method === 'DELETE') {
     const unauthorized = await requireAuth(request, config)
     if (unauthorized) return unauthorized
@@ -635,6 +808,12 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     if (path === '/api/session/refresh') {
       if (request.method !== 'POST') return json(405, { error: 'method_not_allowed' })
       return await handleSessionRefresh(request, config)
+    }
+    if (path === '/api/sync') {
+      return await handleSync(request, config, url)
+    }
+    if (path === '/api/wallpaper/bing') {
+      return await handleBingWallpaper(request, config, url)
     }
     if (path === '/api/state') {
       return await handleState(request, config, url)

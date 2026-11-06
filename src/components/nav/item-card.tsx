@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import {
   Copy,
   ExternalLink,
@@ -60,6 +60,9 @@ export function ItemCard({
   const updateItem = useAppStore((state) => state.updateItem)
   const duplicateItem = useAppStore((state) => state.duplicateItem)
   const networkMode = useAppStore((state) => state.config.networkMode)
+  const iconRadius = useAppStore((state) => state.config.iconRadius)
+  const iconRadiusEnabled = useAppStore((state) => state.config.iconRadiusEnabled)
+  const glassEffect = useAppStore((state) => state.config.glassEffect)
   const effectiveUrl = resolveItemUrl(item, networkMode)
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -95,37 +98,42 @@ export function ItemCard({
   const solidForeground = readableTextColor(accent)
   const isHorizontal = style === 'card' || style === 'transparent' || style === 'solid'
   const iconSize = style === 'icon' ? 36 : style === 'solid' ? 26 : style === 'card' ? 25 : 30
+  const tileStyle = {
+    background:
+      style === 'icon'
+        ? glassEffect
+          ? undefined
+          : `radial-gradient(circle at 30% 15%, ${tintSoft}, transparent 70%), rgba(var(--nav-tile-rgb), .075)`
+        : style === 'card'
+          ? `radial-gradient(circle at 30% 15%, ${tintSoft}, transparent 75%), rgba(var(--nav-tile-rgb), .08)`
+          : undefined,
+  } as CSSProperties
 
   const iconTile = (
     <span
       className={cn(
         'relative flex shrink-0 items-center justify-center transition-all duration-300',
-        style === 'icon' && 'nav-icon-tile h-16 w-16 rounded-[20px] group-hover/card:scale-105 group-hover/card:shadow-glow',
+        style === 'icon' && 'nav-icon-tile h-16 w-16 rounded-[var(--icon-radius,20px)] group-hover/card:scale-105 group-hover/card:shadow-glow',
         style === 'solid' && 'h-10 w-10 rounded-xl border border-white/25 bg-white/15 group-hover/card:bg-white/20',
         style === 'card' && 'h-11 w-11 rounded-[13px] border border-foreground/10 bg-foreground/8',
         style === 'transparent' && 'h-9 w-9 rounded-xl',
+        glassEffect && style === 'icon' && 'nav-glass-tile is-glass',
       )}
-      style={{
-        background:
-          style === 'icon'
-            ? `radial-gradient(circle at 30% 15%, ${tintSoft}, transparent 70%), rgba(var(--nav-tile-rgb), .075)`
-            : style === 'card'
-              ? `radial-gradient(circle at 30% 15%, ${tintSoft}, transparent 75%), rgba(var(--nav-tile-rgb), .08)`
-              : undefined,
-      }}
+      style={tileStyle}
     >
       <NavIcon
         icon={item.icon}
         iconColor={style === 'solid' ? undefined : item.iconColor}
         title={item.title}
         size={iconSize}
+        radius={iconRadiusEnabled ? iconRadius : 0}
       />
       {item.badge && style !== 'solid' && (
         <span className="absolute -right-1.5 -top-1.5 rounded-full border border-foreground/20 bg-gradient-to-r from-violet-500 to-fuchsia-500 px-1.5 py-0.5 text-[8px] font-semibold leading-none text-white shadow-lg">
           {item.badge}
         </span>
       )}
-      {isAdmin && item.hidden && style === 'icon' && (
+      {isAdmin && editMode && item.hidden && style === 'icon' && (
         <span
           className="absolute -bottom-1 -left-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-amber-300 shadow-md ring-1 ring-black/30"
           title="访客不可见"
@@ -186,9 +194,19 @@ export function ItemCard({
         style === 'solid' &&
           'flex h-[78px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] border border-white/20 px-3.5 hover:-translate-y-0.5 hover:brightness-105',
         style === 'card' &&
-          'nav-item-surface flex h-[78px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] px-3.5 hover:-translate-y-0.5 hover:bg-foreground/12 hover:shadow-nav',
+          cn(
+            'nav-item-surface flex h-[78px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] px-3.5 hover:-translate-y-0.5',
+            glassEffect
+              ? 'nav-card-glass is-card-glass'
+              : 'hover:bg-foreground/12 hover:shadow-nav',
+          ),
         style === 'transparent' &&
-          'flex h-[64px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] border border-transparent px-2.5 hover:border-foreground/10 hover:bg-foreground/7',
+          cn(
+            'flex h-[64px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] border px-2.5',
+            glassEffect
+              ? 'nav-card-glass is-card-glass-on-hover'
+              : 'border-transparent hover:border-foreground/10 hover:bg-foreground/7',
+          ),
         editMode && 'ring-1 ring-foreground/10 ring-offset-0 hover:ring-foreground/25',
         item.hidden && !isAdmin && 'hidden',
         className,
@@ -217,7 +235,7 @@ export function ItemCard({
         </span>
       )}
 
-      {isAdmin && item.hidden && style !== 'icon' && (
+      {isAdmin && editMode && item.hidden && style !== 'icon' && (
         <span className="absolute bottom-1 left-1 rounded-full bg-black/60 p-1 text-amber-300" title="访客不可见">
           <EyeOff className="h-3 w-3" />
         </span>

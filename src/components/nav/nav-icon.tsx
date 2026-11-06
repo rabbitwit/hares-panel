@@ -13,6 +13,8 @@ interface NavIconProps {
   size?: number
   className?: string
   imageClassName?: string
+  /** Corner radius (px) applied to image-based icons inside the card. */
+  radius?: number
 }
 
 export function NavIcon({
@@ -22,6 +24,7 @@ export function NavIcon({
   size = 34,
   className,
   imageClassName,
+  radius,
 }: NavIconProps) {
   const gallery = useAppStore((state) => state.gallery)
   const [imageFailed, setImageFailed] = useState(false)
@@ -46,8 +49,12 @@ export function NavIcon({
           draggable={false}
           loading="lazy"
           onError={() => setImageFailed(true)}
-          className={cn('object-contain drop-shadow-sm', imageClassName, className)}
-          style={{ width: size, height: size }}
+          className={cn(
+            'object-contain drop-shadow-sm',
+            imageClassName,
+            className,
+          )}
+          style={{ width: size, height: size, ...(radius != null ? { borderRadius: radius } : {}) }}
         />
       )
     }

@@ -33,6 +33,8 @@ interface CloudState {
   login: (password: string) => Promise<number>
   refreshSession: () => Promise<boolean>
   push: () => Promise<boolean>
+  /** Re-fetch the full state from the server (used after a sync download or an import). */
+  reload: () => Promise<boolean>
   disconnect: () => void
   clearError: () => void
 }
@@ -249,6 +251,23 @@ export const useCloudStore = create<CloudState>()(
 
       disconnect: () =>
         set({ status: 'available', token: null, expiresAt: null, error: null }),
+
+      reload: async () => {
+        const { token, status } = get()
+        if (!token || status !== 'connected') return false
+        set({ busy: true })
+        try {
+          const remote = await fetchCloudState(token)
+          if (remote) {
+            applyRemote(remote.data, remote.updatedAt)
+          }
+          set({ busy: false, error: null, empty: !remote })
+          return Boolean(remote)
+        } catch (error) {
+          set({ busy: false, error: errorMessage(error, '重新读取服务端数据失败') })
+          return false
+        }
+      },
 
       clearError: () => set({ error: null }),
     }),

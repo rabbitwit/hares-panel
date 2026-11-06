@@ -6,6 +6,7 @@ import {
   Info,
   LayoutGrid,
   Palette,
+  RefreshCw,
   Search,
   Settings2,
   ShieldCheck,
@@ -27,6 +28,7 @@ import { SearchSettingsPanel } from '@/components/nav/settings/search-settings'
 import { ContentSettingsPanel } from '@/components/nav/settings/content-settings'
 import { MediaSettingsPanel } from '@/components/nav/settings/media-settings'
 import { CloudSettingsPanel } from '@/components/nav/settings/cloud-settings'
+import { SyncSettingsPanel } from '@/components/nav/settings/sync-settings'
 import { BackupSettingsPanel } from '@/components/nav/settings/backup-settings'
 import { AboutSettingsPanel } from '@/components/nav/settings/about-settings'
 import { useAppStore } from '@/store/app-store'
@@ -49,6 +51,7 @@ const tabs: Array<{
     { id: 'content', label: '分组与内容', icon: LayoutGrid },
     { id: 'media', label: '图标与壁纸', icon: Images },
     { id: 'cloud', label: '服务端与账号', icon: Cloud },
+    { id: 'sync', label: '实例同步', icon: RefreshCw },
     { id: 'backup', label: '备份与恢复', icon: DatabaseBackup },
     { id: 'about', label: '关于', icon: Info },
   ]
@@ -69,6 +72,8 @@ function SettingsPanel({ tab }: { tab: SettingsTab }) {
       return <MediaSettingsPanel />
     case 'cloud':
       return <CloudSettingsPanel />
+    case 'sync':
+      return <SyncSettingsPanel />
     case 'backup':
       return <BackupSettingsPanel />
     case 'about':

@@ -76,7 +76,14 @@ export function FloatingDock() {
   const sortedGroups = [...groups].sort((a, b) => a.sort - b.sort)
 
   return (
-    <div className="fixed bottom-4 right-3 z-40 sm:bottom-7 sm:right-5">
+    <div
+      className={cn(
+        'fixed bottom-4 right-3 z-40 sm:bottom-7 sm:right-5',
+        // On mobile the dock can cover cards; only show it while editing there.
+        // On sm+ screens it is always available.
+        !editMode && 'hidden sm:block',
+      )}
+    >
       <div className="nav-item-surface flex items-center gap-0.5 rounded-2xl border-foreground/10 p-1.5 shadow-2xl backdrop-blur-2xl">
         <DropdownMenu>
           <Tooltip>

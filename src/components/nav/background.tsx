@@ -1,12 +1,69 @@
-import { useId, useMemo } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { useAppStore } from '@/store/app-store'
 import { getPreset } from '@/data/wallpapers'
+import { fetchBingWallpaperUrl } from '@/lib/bing'
+import { colorWithAlpha, cn } from '@/lib/utils'
+
+/**
+ * Blurred colour pools scattered behind the navigation content.
+ *
+ * A backdrop blur only shows its work when there is detail to smear: over the
+ * smooth gradient presets the frosted pane ends up the exact same tint as the
+ * wallpaper beneath, so it reads as a flat overlay instead of glass. (Blurring
+ * the gradient layer itself cannot help, since a blurred gradient is still the
+ * same gradient.) These pools give the panes colour transitions to pick up -- the
+ * matching Bing photo, with its grain and detail, is why the effect works there.
+ */
+function bokehLayer(colors: string[]) {
+  const [a, b, c] = colors
+  const patch = (color: string, x: number, y: number, size: number, alpha: number) =>
+    'radial-gradient(circle ' +
+    size +
+    'px at ' +
+    x +
+    '% ' +
+    y +
+    '%, ' +
+    colorWithAlpha(color, alpha) +
+    ', transparent 68%)'
+
+  // Localised pools rather than page-sized washes: the panes need the colour to
+  // change *across* their own width, otherwise a 14px blur still averages out to
+  // one flat tint. Six pools roughly follow the icon rows and card grid so every
+  // section has a colour transition behind it.
+  return [
+    patch(a, 12, 28, 360, 0.6),
+    patch(b, 88, 24, 380, 0.56),
+    patch(c, 28, 50, 330, 0.54),
+    patch(b, 74, 54, 350, 0.56),
+    patch(a, 44, 72, 380, 0.5),
+    patch(c, 82, 84, 320, 0.48),
+  ].join(', ')
+}
 
 export function NavBackground() {
   const config = useAppStore((state) => state.config)
   const gallery = useAppStore((state) => state.gallery)
   const gradientId = useId().replaceAll(':', '')
   const isLight = config.appearance === 'light'
+  const [bingUrl, setBingUrl] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    if (config.wallpaper.type !== 'bing') {
+      setBingUrl('')
+      return
+    }
+    setBingUrl('')
+    // The image is resolved through our same-origin proxy, so this never hits
+    // the upstream CORS policy that blocks a direct browser fetch.
+    void fetchBingWallpaperUrl(config.bingWallpaperUrl).then((url) => {
+      if (alive && url) setBingUrl(url)
+    })
+    return () => {
+      alive = false
+    }
+  }, [config.wallpaper.type, config.bingWallpaperUrl])
 
   const wallpaper = useMemo(() => {
     const selected = config.wallpaper
@@ -18,20 +75,47 @@ export function NavBackground() {
       const asset = gallery.find((entry) => entry.id === selected.assetId)
       return { type: 'image' as const, css: asset?.dataUrl ? `url("${asset.dataUrl}")` : '', preset: getPreset('nebula') }
     }
+    if (selected.type === 'bing') {
+      return {
+        type: 'image' as const,
+        css: bingUrl ? `url("${bingUrl}")` : '',
+        preset: getPreset('nebula'),
+      }
+    }
     return {
       type: 'image' as const,
       css: selected.url ? `url("${selected.url}")` : '',
       preset: getPreset('nebula'),
     }
-  }, [config.wallpaper, gallery, isLight])
+  }, [config.wallpaper, gallery, isLight, bingUrl])
 
   const waves = wallpaper.preset.waves
   const overlayAlpha = Math.min(100, Math.max(0, config.overlayOpacity)) / 100
 
+  // Photos are busy, so a healthy scrim keeps text readable. The built-in presets
+  // are smooth gradients that are already dimmed by their own base colour — layering
+  // the full photo scrim on top flattens them into a single tone and the frosted panes
+  // stop showing anything at all. With glass enabled the scrim is pulled back so the
+  // cards actually refract the wallpaper, and the gradient waves are blurred behind
+  // the content so the backdrop filter has real detail to work with.
+  const preset = wallpaper.type === 'preset'
+  const glassPreset = preset && config.glassEffect
+  const overlayScale = preset ? (glassPreset ? 0.45 : 0.7) : 1
+  const lightBase = preset ? 0.06 : 0.08
+  const darkOverlay = Math.max(0, Math.min(0.78, overlayAlpha) * overlayScale)
+  const lightOverlay = Math.max(0, Math.min(0.82, overlayAlpha * overlayScale + lightBase))
+  const lightScrim = preset ? (glassPreset ? 0.22 : 0.34) : 0.4
+  const darkScrim = preset ? (glassPreset ? 0.24 : 0.34) : 0.4
+
+  const presetBokeh = useMemo(() => bokehLayer(waves), [waves])
+
   return (
     <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#070a1f]" aria-hidden="true">
       <div
-        className="absolute inset-[-48px] bg-cover bg-center transition-[filter] duration-500"
+        className={cn(
+          'wallpaper-layer absolute inset-[-48px] bg-cover bg-center',
+          glassPreset && 'wallpaper-preset',
+        )}
         style={{
           backgroundImage: wallpaper.css,
           filter: config.wallpaperBlur > 0 ? `blur(${config.wallpaperBlur}px)` : undefined,
@@ -39,7 +123,7 @@ export function NavBackground() {
         }}
       />
 
-      {wallpaper.type === 'preset' && (
+      {preset && (
         <svg
           viewBox="0 0 1600 1000"
           preserveAspectRatio="xMidYMid slice"
@@ -92,8 +176,8 @@ export function NavBackground() {
         className="absolute inset-0 transition-colors duration-500"
         style={{
           backgroundColor: isLight
-            ? `rgba(255, 255, 255, ${Math.min(0.82, overlayAlpha + 0.08)})`
-            : `rgba(3, 6, 20, ${Math.min(0.78, overlayAlpha)})`,
+            ? `rgba(255, 255, 255, ${lightOverlay})`
+            : `rgba(3, 6, 20, ${darkOverlay})`,
         }}
       />
 
@@ -101,10 +185,21 @@ export function NavBackground() {
         className="absolute inset-0"
         style={{
           background: isLight
-            ? 'radial-gradient(ellipse 80% 65% at 50% 35%, transparent 20%, rgba(255,255,255,.4) 100%)'
-            : 'radial-gradient(ellipse 90% 75% at 50% 35%, transparent 30%, rgba(2,4,14,.4) 100%)',
+            ? `radial-gradient(ellipse 80% 65% at 50% 35%, transparent 20%, rgba(255,255,255,${lightScrim}) 100%)`
+            : `radial-gradient(ellipse 90% 75% at 50% 35%, transparent 30%, rgba(2,4,14,${darkScrim}) 100%)`,
         }}
       />
+
+      {glassPreset && (
+        <div
+          className={
+            'wallpaper-bokeh absolute -inset-16 ' +
+            (isLight ? 'opacity-70' : 'opacity-80 mix-blend-screen')
+          }
+          style={{ backgroundImage: presetBokeh }}
+        />
+      )}
+
       <div className="noise-layer absolute inset-0" />
     </div>
   )

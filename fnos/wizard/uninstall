@@ -1,0 +1,27 @@
+[
+  {
+    "stepTitle": "卸载确认",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "卸载 Hares-Panel 后，应用数据（位于应用数据目录）可以保留或一并删除。"
+      },
+      {
+        "type": "radio",
+        "field": "wizard_keep_data",
+        "label": "卸载时如何处理应用数据？",
+        "initValue": "keep",
+        "options": [
+          {
+            "label": "保留数据（推荐）",
+            "value": "keep"
+          },
+          {
+            "label": "同时删除所有数据",
+            "value": "delete"
+          }
+        ]
+      }
+    ]
+  }
+]

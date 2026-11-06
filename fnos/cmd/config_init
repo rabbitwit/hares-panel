@@ -1,1 +1,3 @@
-#!/bin/bash`n# Called before the app settings page opens.`nexit 0`n
+#!/bin/bash
+# Called before the app settings page opens.
+exit 0

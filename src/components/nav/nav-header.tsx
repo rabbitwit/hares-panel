@@ -7,6 +7,7 @@ export function NavHeader() {
   const config = useAppStore((state) => state.config)
   const now = useClock(config.showClock)
   const showLogo = config.showLogo
+  const showLogoMark = config.showLogoMark
   const showClock = config.showClock
   if (!showLogo && !showClock) return null
 
@@ -16,6 +17,8 @@ export function NavHeader() {
         {showLogo && (
           <div className="flex items-center">
             <SiteLogo
+              showLogoMark={showLogoMark}
+              showText={showLogo}
               textClassName="text-shadow-nav text-[30px] text-foreground sm:text-[36px] lg:text-[42px]"
               markClassName="h-10 w-10 sm:h-12 sm:w-12"
             />

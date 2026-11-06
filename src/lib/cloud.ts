@@ -49,6 +49,52 @@ export interface CloudUploadResult {
   contentType: string
 }
 
+export type CloudSyncMode = 'auto' | 'upload' | 'download'
+export type CloudSyncDirection = 'upload' | 'download' | 'none'
+export type CloudSyncAction = 'sync' | 'test'
+
+export interface CloudSyncRemoteSummary {
+  app: string
+  version: number | null
+  ok: boolean
+  runtime: string | null
+  storage: string | null
+  assets: string | null
+  limits: { stateBytes: number; assetBytes: number } | null
+}
+
+export interface CloudSyncAssetSummary {
+  enabled: boolean
+  total: number
+  transferred: number
+  existing: number
+  failed: number
+  warnings: string[]
+}
+
+export interface CloudSyncResult {
+  ok: boolean
+  action: CloudSyncAction
+  mode: CloudSyncMode
+  direction: CloudSyncDirection
+  localUpdatedAt: number | null
+  remoteUpdatedAt: number | null
+  updatedAt: number | null
+  remote: CloudSyncRemoteSummary
+  empty?: boolean
+  assets?: CloudSyncAssetSummary
+  warnings?: string[]
+  data?: AppData
+}
+
+export interface CloudSyncOptions {
+  remoteUrl: string
+  password: string
+  mode?: CloudSyncMode
+  includeAssets?: boolean
+  action?: CloudSyncAction
+}
+
 export class CloudApiError extends Error {
   status: number
   code: string
@@ -225,6 +271,30 @@ export async function deleteCloudAsset(
     headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
     body: JSON.stringify({ url }),
     timeoutMs: 15_000,
+  })
+}
+
+export async function syncCloudState(
+  token: string,
+  options: {
+    remoteUrl: string
+    password: string
+    mode?: CloudSyncMode
+    includeAssets?: boolean
+    action?: CloudSyncAction
+  },
+): Promise<CloudSyncResult> {
+  return api<CloudSyncResult>('/sync', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      remoteUrl: options.remoteUrl,
+      password: options.password,
+      mode: options.mode ?? 'auto',
+      includeAssets: options.includeAssets !== false,
+      action: options.action ?? 'sync',
+    }),
+    timeoutMs: 90_000,
   })
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "hares-panel",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "A Sun-Panel style navigation homepage backed by Cloudflare Workers, Vercel or EdgeOne Makers, with server-side storage.",
   "scripts": {
@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit --pretty false",
-    "test:api": "node tests/api-core.test.mjs && node tests/server-runtimes.test.mjs && node tests/edgeone.test.mjs && node tests/backup.test.mjs && node tests/docker-runtime.test.mjs",
+    "test:api": "node tests/api-core.test.mjs && node tests/sync.test.mjs && node tests/server-runtimes.test.mjs && node tests/edgeone.test.mjs && node tests/backup.test.mjs && node tests/docker-runtime.test.mjs",
     "mock:api": "node tests/mock-server.mjs",
     "deploy:cf": "npm run build && wrangler deploy",
     "deploy:vercel": "npm run build && npx vercel --prod",

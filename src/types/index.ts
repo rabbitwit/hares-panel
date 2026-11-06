@@ -58,6 +58,7 @@ export type Wallpaper =
   | { type: 'preset'; presetId: string }
   | { type: 'url'; url: string }
   | { type: 'gallery'; assetId: string }
+  | { type: 'bing' }
 
 export interface SiteConfig {
   siteName: string
@@ -68,6 +69,8 @@ export interface SiteConfig {
   /** Avatar URL or `gallery:<assetId>` reference for the administrator. */
   adminAvatar: string
   showLogo: boolean
+  /** Whether to show the logo image mark above the search on the nav page. */
+  showLogoMark: boolean
   showClock: boolean
   showSeconds: boolean
   showDate: boolean
@@ -78,12 +81,20 @@ export interface SiteConfig {
   defaultEngineId: string
   searchInNewTab: boolean
   wallpaper: Wallpaper
+  /** URL of the Bing daily-image API used when wallpaper type is `bing`. */
+  bingWallpaperUrl: string
   wallpaperBlur: number
   overlayOpacity: number
   appearance: Appearance
   defaultCardStyle: CardStyle
   cardRadius: number
+  /** Whether icon corner rounding is enabled. When off, icons render square. */
+  iconRadiusEnabled: boolean
+  /** Corner radius (px) of the icon tile in icon-style cards. */
+  iconRadius: number
   glowEffect: boolean
+  /** Whether card backgrounds use a frosted-glass (backdrop blur) look. */
+  glassEffect: boolean
   showSystemStatus: boolean
   systemStatusTitle: string
   footerEnabled: boolean

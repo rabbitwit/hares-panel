@@ -46,7 +46,7 @@ export function TopControls() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="nav-item-surface inline-flex h-10 items-center gap-2 rounded-full px-3.5 text-foreground/85 shadow-nav outline-none transition-colors hover:bg-foreground/15 focus-visible:ring-2 focus-visible:ring-foreground/30"
+              className="nav-item-surface hidden h-10 items-center gap-2 rounded-full px-3.5 text-foreground/85 shadow-nav outline-none transition-colors hover:bg-foreground/15 focus-visible:ring-2 focus-visible:ring-foreground/30 sm:inline-flex"
               aria-label="切换网络环境"
             >
               <NetworkIcon className="h-4 w-4" />
@@ -91,7 +91,7 @@ export function TopControls() {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="nav-item-surface inline-flex h-10 items-center gap-2 rounded-full py-1 pl-1 pr-2.5 text-foreground/85 shadow-nav outline-none transition-colors hover:bg-foreground/15 focus-visible:ring-2 focus-visible:ring-foreground/30"
+              className="nav-item-surface inline-flex h-10 items-center gap-2 rounded-full p-1 text-foreground/85 shadow-nav outline-none transition-colors hover:bg-foreground/15 focus-visible:ring-2 focus-visible:ring-foreground/30 sm:pr-2.5"
               aria-label="账户菜单"
             >
               <UserAvatar

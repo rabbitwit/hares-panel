@@ -85,10 +85,12 @@ export function AppearanceSettingsPanel() {
   const [wallpaperUrl, setWallpaperUrl] = useState(
     config.wallpaper.type === 'url' ? config.wallpaper.url : '',
   )
+  const [bingEndpoint, setBingEndpoint] = useState(config.bingWallpaperUrl)
 
   const isLight = config.appearance === 'light'
   const wallpaper = config.wallpaper
   const selectedPresetId = wallpaper.type === 'preset' ? wallpaper.presetId : null
+  const selectedBing = wallpaper.type === 'bing'
   const galleryAsset =
     wallpaper.type === 'gallery'
       ? gallery.find((asset) => asset.id === wallpaper.assetId) ?? null
@@ -218,6 +220,36 @@ export function AppearanceSettingsPanel() {
             </button>
           ))}
 
+          <button
+            type="button"
+            onClick={() => applyWallpaper({ type: 'bing' })}
+            className={cn(
+              'group relative aspect-[16/9] overflow-hidden rounded-xl border-2 transition-all',
+              selectedBing
+                ? 'border-primary shadow-lg shadow-primary/20'
+                : 'border-transparent hover:border-white/20',
+            )}
+          >
+            <span
+              className="absolute inset-0 transition-transform duration-500 group-hover:scale-105"
+              style={{
+                background: isLight
+                  ? 'linear-gradient(135deg,#dbeafe 0%,#e0f2fe 50%,#c7d2fe 100%)'
+                  : 'linear-gradient(135deg,#1e3a5f 0%,#14424b 50%,#24326b 100%)',
+              }}
+            />
+            <span className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+            <span className="absolute bottom-2 left-2.5 text-[11px] font-medium text-white drop-shadow">
+              必应每日壁纸
+            </span>
+            <span className="absolute right-2 top-2 text-[10px] text-white/85 drop-shadow">Bing</span>
+            {selectedBing && (
+              <span className="absolute right-2 bottom-2 flex h-5 w-5 items-center justify-center rounded-full bg-white text-black">
+                <Check className="h-3 w-3" />
+              </span>
+            )}
+          </button>
+
           {galleryAsset && (
             <div className="relative aspect-[16/9] overflow-hidden rounded-xl border-2 border-primary">
               <img src={galleryAsset.dataUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -263,6 +295,31 @@ export function AppearanceSettingsPanel() {
             应用
           </Button>
         </div>
+
+        {selectedBing && (
+          <div className="mt-4 flex gap-2">
+            <Input
+              value={bingEndpoint}
+              onChange={(event) => setBingEndpoint(event.target.value)}
+              placeholder="必应每日壁纸接口地址，例如 https://api.bimg.cc/today（也支持 https://bing.xinac.net/api/today?format=json）"
+              spellCheck={false}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (!bingEndpoint.trim()) {
+                  toast.error('请填写必应壁纸接口地址')
+                  return
+                }
+                updateConfig({ bingWallpaperUrl: bingEndpoint.trim() })
+                toast.success('已更新必应壁纸接口')
+              }}
+            >
+              应用
+            </Button>
+          </div>
+        )}
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -337,20 +394,59 @@ export function AppearanceSettingsPanel() {
               onValueChange={([value]) => updateConfig({ cardRadius: value })}
             />
           </div>
+          <div className="space-y-2">
+            <SwitchRow
+              label="图标圆角"
+              hint="为图标模式卡片启用圆角；关闭后图标保持直角。"
+              checked={config.iconRadiusEnabled}
+              onCheckedChange={(value) => updateConfig({ iconRadiusEnabled: value })}
+            />
+            {config.iconRadiusEnabled && (
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">圆角大小</Label>
+                  <span className="text-[10px] text-muted-foreground">{config.iconRadius}px</span>
+                </div>
+                <Slider
+                  value={[config.iconRadius]}
+                  min={0}
+                  max={28}
+                  step={1}
+                  onValueChange={([value]) => updateConfig({ iconRadius: value })}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-2 border-t border-border/60">
           <SwitchRow
             label="悬浮光效"
             hint="鼠标悬停卡片时显示柔光"
             checked={config.glowEffect}
             onCheckedChange={(value) => updateConfig({ glowEffect: value })}
           />
+          <SwitchRow
+            label="毛玻璃效果"
+            hint="卡片背景模糊透出壁纸，类似磨砂玻璃；低端设备建议关闭。"
+            checked={config.glassEffect}
+            onCheckedChange={(value) => updateConfig({ glassEffect: value })}
+          />
         </div>
       </SettingsSection>
 
       <SettingsSection title="顶部品牌与时钟">
         <SwitchRow
-          label="显示站点 Logo 和名称"
+          label="显示站点名称"
+          hint="在搜索栏上方显示站点名称文字。"
           checked={config.showLogo}
           onCheckedChange={(value) => updateConfig({ showLogo: value })}
+        />
+        <SwitchRow
+          label="显示 Logo 图标"
+          hint="在搜索栏上方显示站点 Logo 图标；关闭后只保留名称文字。"
+          checked={config.showLogoMark}
+          onCheckedChange={(value) => updateConfig({ showLogoMark: value })}
         />
         <SwitchRow
           label="显示时钟"

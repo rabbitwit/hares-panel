@@ -16,7 +16,7 @@ fnos/
 ├── config/
 │   ├── privilege                # 运行身份
 │   └── resource                 # docker-project 声明
-├── wizard/                      # 安装向导（当前为空）
+├── wizard/                      # 安装向导 + 卸载向导
 ├── ICON.PNG / ICON_256.PNG      # 应用中心图标
 └── build.ps1 / build.sh         # 打包脚本
 ```
@@ -51,9 +51,20 @@ FNPACK=/path/to/fnpack ./build.sh
 ## 安装
 
 1. 飞牛 fnOS → 应用中心 → 手动安装（或「安装应用」选择 `.fpk` 文件）；
-2. 安装完成后从桌面图标打开，地址为 `http://<NAS IP>:18000`；
-3. 首次启动会自动生成管理员密码，可在容器日志中查看，或读取应用数据目录里的 `admin-password`。
+2. 安装向导 `wizard/install` 会提示设置**管理员密码**（可选）：
+   - 填写密码：`cmd/install_callback` 会写入 `${TRIM_PKGVAR}/data/admin-password`，首次启动即用该密码；
+   - 留空：首次启动自动生成随机密码，可查看容器日志或应用数据目录里的 `admin-password`；
+3. 安装完成后从桌面图标打开，地址为 `http://<NAS IP>:18000`，用第 2 步设置的密码登录。
 
 ## 升级
 
-修改项目根目录 `package.json` 的 `version` 后重新打包安装即可（`build.sh` / `build.ps1` 会自动同步到 `manifest`）；`${TRIM_PKGVAR}/data` 不会被清空。
+修改项目根目录 `package.json` 的 `version` 后，同步 `package-lock.json` 的版本，再重新打包安装即可（`build.sh` / `build.ps1` 会自动把版本同步到 `manifest`）；`${TRIM_PKGVAR}/data` 不会被清空。
+
+## 卸载
+
+卸载应用时，`wizard/uninstall` 会弹出确认向导，让用户选择卸载后**保留还是删除应用数据**（默认保留）：
+
+- 选「保留数据」：`${TRIM_PKGVAR}/data`（即容器内的 `/data`）会保留，数据不会被清空；
+- 选「同时删除所有数据」：`cmd/uninstall_callback` 会删除 `${TRIM_PKGVAR}/data`。
+
+数据是否删除由用户在向导中的选择决定，脚本不会擅自清除用户数据。

@@ -205,6 +205,111 @@
     border-color: rgba(15, 23, 42, 0.06);
   }
 
+  /*
+   * Glassmorphism, following the reference recipe:
+   *   background: rgba(255, 255, 255, 0.15);
+   *   backdrop-filter: blur(14px);
+   *   border: 1px solid rgba(255, 255, 255, 0.3);
+   *   border-radius: 24px;
+   *   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+   *
+   * Targets:
+   *   - icon mode: the icon tile becomes glass while the layout stays unchanged.
+   *   - card mode: the whole card becomes glass.
+   *   - transparent mode: fully transparent at rest, glass only on hover.
+   *
+   * Light mode keeps the same recipe with a slightly stronger white layer and
+   * a softer blue shadow so the pane stays visible on pale wallpapers.
+   */
+  .nav-card-glass.is-card-glass-on-hover {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    transition:
+      background-color 0.25s ease,
+      -webkit-backdrop-filter 0.25s ease,
+      backdrop-filter 0.25s ease,
+      box-shadow 0.25s ease,
+      border-color 0.25s ease;
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .nav-glass-tile.is-glass {
+      -webkit-backdrop-filter: blur(var(--card-blur, 14px));
+      backdrop-filter: blur(var(--card-blur, 14px));
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+
+    .nav-card-glass.is-card-glass,
+    .nav-card-glass.is-card-glass-on-hover:hover {
+      -webkit-backdrop-filter: blur(var(--card-blur, 14px));
+      backdrop-filter: blur(var(--card-blur, 14px));
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+
+    .nav-card-glass.is-card-glass:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    :root:not(.dark) .nav-glass-tile.is-glass {
+      -webkit-backdrop-filter: blur(var(--card-blur, 14px));
+      backdrop-filter: blur(var(--card-blur, 14px));
+      background: rgba(255, 255, 255, 0.28);
+      border-color: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.22);
+    }
+
+    :root:not(.dark) .nav-card-glass.is-card-glass,
+    :root:not(.dark) .nav-card-glass.is-card-glass-on-hover:hover {
+      -webkit-backdrop-filter: blur(var(--card-blur, 14px));
+      backdrop-filter: blur(var(--card-blur, 14px));
+      background: rgba(255, 255, 255, 0.28);
+      border-color: rgba(255, 255, 255, 0.6);
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.22);
+    }
+
+    :root:not(.dark) .nav-card-glass.is-card-glass:hover {
+      background: rgba(255, 255, 255, 0.36);
+      border-color: rgba(255, 255, 255, 0.7);
+    }
+  }
+
+  /*
+   * Built-in gradient wallpapers + 毛玻璃.
+   *
+   * The presets are smooth gradients, so unlike a photo there is no detail under
+   * the cards for `backdrop-filter: blur()` to smear: the pane comes out the same
+   * flat tint as the wallpaper and the glass reads as a plain overlay. Blurring the
+   * gradient layer itself cannot help, because a blurred gradient is still that
+   * gradient. Saturation keeps the colour transitions visible through the panes;
+   * the colour pools are painted by NavBackground.
+   */
+  .wallpaper-layer.wallpaper-preset {
+    -webkit-filter: saturate(118%);
+    filter: saturate(118%);
+  }
+
+  /*
+   * Soften the colour pools' rims so they blend into the wallpaper like the
+   * blurred decorative shapes in the reference. Their centres still carry enough
+   * colour for the frosted panes to pick up a visible gradient.
+   */
+  .wallpaper-bokeh {
+    -webkit-filter: blur(18px);
+    filter: blur(18px);
+  }
+
+  .settings-scroll {
+    scrollbar-gutter: stable;
+  }
+
   .noise-layer {
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 220 220' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.36'/%3E%3C/svg%3E");
     opacity: 0.035;
@@ -243,10 +348,6 @@
 
   .drag-handle:active {
     cursor: grabbing;
-  }
-
-  .settings-scroll {
-    scrollbar-gutter: stable;
   }
 }
 
