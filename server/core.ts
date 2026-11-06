@@ -17,10 +17,26 @@ export interface StoredState {
   updatedAt: number
 }
 
+/** Last cross-instance sync outcome, shown read-only on the target instance. */
+export interface SyncMeta {
+  /** When the last sync that touched this instance ran. */
+  lastSyncAt: number
+  /** Whether that sync succeeded. */
+  success: boolean
+  /** Direction from the initiator's point of view: upload / download. */
+  direction: 'upload' | 'download' | 'none'
+  /** Optional failure message. */
+  error?: string
+}
+
 export interface StateStore {
   kind: 'kv' | 'd1' | 'redis' | 'edgeone-blob' | 'file'
   getState(): Promise<StoredState | null>
   putState(data: unknown): Promise<number>
+  /** Read the side-channel sync-status record, or null if never set. */
+  getMeta(): Promise<SyncMeta | null>
+  /** Persist the side-channel sync-status record. */
+  putMeta(meta: SyncMeta): Promise<void>
 }
 
 export interface StoredAsset {
@@ -507,10 +523,67 @@ async function handleSync(request: Request, config: ApiConfig, url: URL): Promis
     return json(200, result)
   } catch (error) {
     if (error instanceof SyncError) {
+      if (config.state) {
+        try {
+          await config.state.putMeta({
+            lastSyncAt: Date.now(),
+            success: false,
+            direction: 'none',
+            error: error.message,
+          })
+        } catch {
+          // Best effort: a failed status write must not change the response.
+        }
+      }
       return json(error.status, { error: error.code, message: error.message })
     }
     throw error
   }
+}
+
+async function handleSyncStatus(request: Request, config: ApiConfig): Promise<Response> {
+  if (!config.state) {
+    return json(503, { error: 'not_configured', message: '云端存储尚未配置' })
+  }
+  if (request.method === 'GET') {
+    const unauthorized = await requireAuth(request, config)
+    if (unauthorized) return unauthorized
+    let meta: SyncMeta | null = null
+    try {
+      meta = await config.state.getMeta()
+    } catch {
+      return json(503, { error: 'storage_unavailable', message: '云端存储暂时不可用' })
+    }
+    return json(200, { meta })
+  }
+  if (request.method === 'POST') {
+    const unauthorized = await requireAuth(request, config)
+    if (unauthorized) return unauthorized
+    const parsed = await readJsonLimited(request, 16 * 1024)
+    if (!parsed.ok || !isRecord(parsed.value)) {
+      return json(400, { error: 'bad_request', message: '同步状态格式不正确' })
+    }
+    const value = parsed.value
+    const meta: SyncMeta = {
+      lastSyncAt:
+        typeof value.lastSyncAt === 'number' && Number.isFinite(value.lastSyncAt)
+          ? value.lastSyncAt
+          : Date.now(),
+      success: value.success !== false,
+      direction:
+        value.direction === 'upload' || value.direction === 'download'
+          ? value.direction
+          : 'none',
+      ...(typeof value.error === 'string' && value.error ? { error: value.error } : {}),
+    }
+    try {
+      await config.state.putMeta(meta)
+    } catch {
+      return json(503, { error: 'storage_unavailable', message: '保存同步状态失败' })
+    }
+    return json(200, { meta })
+  }
+  return json(405, { error: 'method_not_allowed' })
 }
 
 async function handleState(request: Request, config: ApiConfig, url: URL): Promise<Response> {
@@ -811,6 +884,9 @@ export async function handleApi(request: Request, config: ApiConfig): Promise<Re
     }
     if (path === '/api/sync') {
       return await handleSync(request, config, url)
+    }
+    if (path === '/api/sync/status') {
+      return await handleSyncStatus(request, config)
     }
     if (path === '/api/wallpaper/bing') {
       return await handleBingWallpaper(request, config, url)

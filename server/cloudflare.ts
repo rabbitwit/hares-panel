@@ -1,4 +1,4 @@
-import type { ApiConfig, AssetStore, StateStore } from './core'
+import type { ApiConfig, AssetStore, StateStore, SyncMeta } from './core'
 
 /** Minimal structural types so the Worker bundle stays free of runtime packages. */
 export interface KVNamespaceLike {
@@ -50,6 +50,7 @@ export interface EnvLike {
 }
 
 const STATE_KEY = 'hares-panel:state:default'
+const STATE_META_KEY = 'hares-panel:sync-meta:default'
 
 function kvStateStore(kv: KVNamespaceLike): StateStore {
   return {
@@ -72,6 +73,19 @@ function kvStateStore(kv: KVNamespaceLike): StateStore {
       const updatedAt = Date.now()
       await kv.put(STATE_KEY, JSON.stringify({ data, updatedAt }))
       return updatedAt
+    },
+    async getMeta() {
+      const raw = await kv.get(STATE_META_KEY)
+      if (!raw) return null
+      try {
+        const parsed = JSON.parse(raw)
+        return parsed && typeof parsed === 'object' ? (parsed as SyncMeta) : null
+      } catch {
+        return null
+      }
+    },
+    async putMeta(meta) {
+      await kv.put(STATE_META_KEY, JSON.stringify(meta))
     },
   }
 }
@@ -116,6 +130,25 @@ function writeD1State(
     .run()
 }
 
+const D1_META_TABLE = 'hares_panel_sync_meta'
+
+let d1MetaReady: Promise<unknown> | null = null
+
+function ensureD1MetaTable(db: D1DatabaseLike): Promise<unknown> {
+  if (!d1MetaReady) {
+    d1MetaReady = db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS ${D1_META_TABLE} (id TEXT PRIMARY KEY, data TEXT NOT NULL)`,
+      )
+      .run()
+      .catch((error) => {
+        d1MetaReady = null
+        throw error
+      })
+  }
+  return d1MetaReady
+}
+
 function d1StateStore(db: D1DatabaseLike): StateStore {
   return {
     kind: 'd1',
@@ -132,6 +165,29 @@ function d1StateStore(db: D1DatabaseLike): StateStore {
       const updatedAt = Date.now()
       await writeD1State(db, data, updatedAt)
       return updatedAt
+    },
+    async getMeta() {
+      await ensureD1MetaTable(db)
+      const row = await db
+        .prepare(`SELECT data FROM ${D1_META_TABLE} WHERE id = ?`)
+        .bind('default')
+        .first<{ data: string }>()
+      if (!row) return null
+      try {
+        const parsed = JSON.parse(row.data)
+        return parsed && typeof parsed === 'object' ? (parsed as SyncMeta) : null
+      } catch {
+        return null
+      }
+    },
+    async putMeta(meta) {
+      await ensureD1MetaTable(db)
+      await db
+        .prepare(
+          `INSERT INTO ${D1_META_TABLE} (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data`,
+        )
+        .bind('default', JSON.stringify(meta))
+        .run()
     },
   }
 }

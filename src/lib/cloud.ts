@@ -53,6 +53,14 @@ export type CloudSyncMode = 'auto' | 'upload' | 'download'
 export type CloudSyncDirection = 'upload' | 'download' | 'none'
 export type CloudSyncAction = 'sync' | 'test'
 
+/** Last cross-instance sync outcome, shown read-only on the target instance. */
+export interface CloudSyncMeta {
+  lastSyncAt: number
+  success: boolean
+  direction: CloudSyncDirection
+  error?: string
+}
+
 export interface CloudSyncRemoteSummary {
   app: string
   version: number | null
@@ -296,6 +304,24 @@ export async function syncCloudState(
     }),
     timeoutMs: 90_000,
   })
+}
+
+/** Read this instance's last sync status (read-only on the target/public side). */
+export async function fetchSyncMeta(token: string): Promise<CloudSyncMeta | null> {
+  const payload = await api<{ meta?: unknown }>('/sync/status', {
+    headers: { authorization: `Bearer ${token}` },
+    timeoutMs: 12_000,
+  })
+  const meta = payload?.meta
+  if (!meta || typeof meta !== 'object') return null
+  const record = meta as Record<string, unknown>
+  return {
+    lastSyncAt: typeof record.lastSyncAt === 'number' ? record.lastSyncAt : Date.now(),
+    success: record.success !== false,
+    direction:
+      record.direction === 'upload' || record.direction === 'download' ? record.direction : 'none',
+    ...(typeof record.error === 'string' && record.error ? { error: record.error } : {}),
+  }
 }
 
 export function dataUrlToBlob(dataUrl: string): Blob {

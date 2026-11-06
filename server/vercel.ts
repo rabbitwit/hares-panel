@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { del, put } from '@vercel/blob'
-import type { ApiConfig, AssetStore, StateStore } from './core'
+import type { ApiConfig, AssetStore, StateStore, SyncMeta } from './core'
 
 export interface VercelEnv {
   ADMIN_PASSWORD?: string
@@ -13,6 +13,7 @@ export interface VercelEnv {
 }
 
 const STATE_KEY = 'hares-panel:state:default'
+const STATE_META_KEY = 'hares-panel:sync-meta:default'
 const ASSET_PREFIX = 'hares-panel'
 const MAX_REQUEST_BYTES = 12 * 1024 * 1024
 
@@ -66,6 +67,23 @@ function redisStateStore(credentials: { url: string; token: string }): StateStor
         body: JSON.stringify({ data, updatedAt }),
       })
       return updatedAt
+    },
+    async getMeta() {
+      const raw = await redisRequest(credentials, `/get/${encodeURIComponent(STATE_META_KEY)}`)
+      if (typeof raw !== 'string' || !raw) return null
+      try {
+        const parsed = JSON.parse(raw)
+        return parsed && typeof parsed === 'object' ? (parsed as SyncMeta) : null
+      } catch {
+        return null
+      }
+    },
+    async putMeta(meta) {
+      await redisRequest(credentials, `/set/${encodeURIComponent(STATE_META_KEY)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(meta),
+      })
     },
   }
 }

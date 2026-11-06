@@ -797,6 +797,33 @@ async function pushRemoteState(options, remote, data) {
 function localStateLimit(config) {
   return config.stateMaxBytes ?? DEFAULT_STATE_MAX_BYTES;
 }
+async function recordSyncMeta(config, remote, direction, success, options = {}, error) {
+  const meta = {
+    lastSyncAt: Date.now(),
+    success,
+    direction,
+    ...error ? { error } : {}
+  };
+  if (config.state) {
+    try {
+      await config.state.putMeta(meta);
+    } catch {
+    }
+  }
+  if (remote && success) {
+    try {
+      await remoteFetch(options, `${remote.base}/api/sync/status`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${remote.token}`
+        },
+        body: JSON.stringify(meta)
+      });
+    } catch {
+    }
+  }
+}
 async function performSync(config, input, options = {}) {
   const action = input.action === "test" ? "test" : "sync";
   const mode = normalizeMode(input.mode);
@@ -857,6 +884,7 @@ async function performSync(config, input, options = {}) {
     direction = remoteState.updatedAt > localState.updatedAt ? "download" : "upload";
   }
   if (direction === "none") {
+    await recordSyncMeta(config, remote, "none", true, options);
     return {
       ok: true,
       action,
@@ -881,6 +909,7 @@ async function performSync(config, input, options = {}) {
       target2
     );
     const updatedAt2 = await pushRemoteState(options, remote, target2);
+    await recordSyncMeta(config, remote, direction, true, options);
     return {
       ok: true,
       action,
@@ -917,6 +946,7 @@ async function performSync(config, input, options = {}) {
   } catch {
     throw new SyncError(503, "local_save_failed", "\u4FDD\u5B58\u5230\u672C\u673A\u5931\u8D25");
   }
+  await recordSyncMeta(config, remote, "download", true, options);
   return {
     ok: true,
     action,
@@ -1305,10 +1335,59 @@ async function handleSync(request, config, url) {
     return json(200, result);
   } catch (error) {
     if (error instanceof SyncError) {
+      if (config.state) {
+        try {
+          await config.state.putMeta({
+            lastSyncAt: Date.now(),
+            success: false,
+            direction: "none",
+            error: error.message
+          });
+        } catch {
+        }
+      }
       return json(error.status, { error: error.code, message: error.message });
     }
     throw error;
   }
+}
+async function handleSyncStatus(request, config) {
+  if (!config.state) {
+    return json(503, { error: "not_configured", message: "\u4E91\u7AEF\u5B58\u50A8\u5C1A\u672A\u914D\u7F6E" });
+  }
+  if (request.method === "GET") {
+    const unauthorized = await requireAuth(request, config);
+    if (unauthorized) return unauthorized;
+    let meta = null;
+    try {
+      meta = await config.state.getMeta();
+    } catch {
+      return json(503, { error: "storage_unavailable", message: "\u4E91\u7AEF\u5B58\u50A8\u6682\u65F6\u4E0D\u53EF\u7528" });
+    }
+    return json(200, { meta });
+  }
+  if (request.method === "POST") {
+    const unauthorized = await requireAuth(request, config);
+    if (unauthorized) return unauthorized;
+    const parsed = await readJsonLimited(request, 16 * 1024);
+    if (!parsed.ok || !isRecord3(parsed.value)) {
+      return json(400, { error: "bad_request", message: "\u540C\u6B65\u72B6\u6001\u683C\u5F0F\u4E0D\u6B63\u786E" });
+    }
+    const value = parsed.value;
+    const meta = {
+      lastSyncAt: typeof value.lastSyncAt === "number" && Number.isFinite(value.lastSyncAt) ? value.lastSyncAt : Date.now(),
+      success: value.success !== false,
+      direction: value.direction === "upload" || value.direction === "download" ? value.direction : "none",
+      ...typeof value.error === "string" && value.error ? { error: value.error } : {}
+    };
+    try {
+      await config.state.putMeta(meta);
+    } catch {
+      return json(503, { error: "storage_unavailable", message: "\u4FDD\u5B58\u540C\u6B65\u72B6\u6001\u5931\u8D25" });
+    }
+    return json(200, { meta });
+  }
+  return json(405, { error: "method_not_allowed" });
 }
 async function handleState(request, config, url) {
   if (!config.state) {
@@ -1555,6 +1634,9 @@ async function handleApi(request, config) {
     if (path === "/api/sync") {
       return await handleSync(request, config, url);
     }
+    if (path === "/api/sync/status") {
+      return await handleSyncStatus(request, config);
+    }
     if (path === "/api/wallpaper/bing") {
       return await handleBingWallpaper(request, config, url);
     }
@@ -1573,6 +1655,7 @@ async function handleApi(request, config) {
 
 // server/edgeone.ts
 var STATE_KEY = "state/default.json";
+var STATE_META_KEY = "state/sync-meta.json";
 var ASSET_PREFIX = "assets/";
 var EDGEONE_MAX_BODY_BYTES = 5 * 1024 * 1024;
 function edgeOneStateStore(store) {
@@ -1592,6 +1675,13 @@ function edgeOneStateStore(store) {
       const updatedAt = Date.now();
       await store.setJSON(STATE_KEY, { data, updatedAt });
       return updatedAt;
+    },
+    async getMeta() {
+      const value = await store.get(STATE_META_KEY, { type: "json", consistency: "strong" });
+      return value && typeof value === "object" ? value : null;
+    },
+    async putMeta(meta) {
+      await store.setJSON(STATE_META_KEY, meta);
     }
   };
 }

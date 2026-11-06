@@ -8,7 +8,7 @@
  * with the same code.
  */
 
-import type { ApiConfig } from './core'
+import type { ApiConfig, SyncMeta } from './core'
 
 export type SyncMode = 'auto' | 'upload' | 'download'
 export type SyncDirection = 'upload' | 'download' | 'none'
@@ -855,6 +855,44 @@ function localStateLimit(config: ApiConfig): number {
   return config.stateMaxBytes ?? DEFAULT_STATE_MAX_BYTES
 }
 
+async function recordSyncMeta(
+  config: ApiConfig,
+  remote: RemoteConnection | null,
+  direction: SyncDirection,
+  success: boolean,
+  options: SyncOptions = {},
+  error?: string,
+): Promise<void> {
+  const meta: SyncMeta = {
+    lastSyncAt: Date.now(),
+    success,
+    direction,
+    ...(error ? { error } : {}),
+  }
+  if (config.state) {
+    try {
+      await config.state.putMeta(meta)
+    } catch {
+      // Best effort: a failed status write must not break an otherwise
+      // successful sync.
+    }
+  }
+  if (remote && success) {
+    try {
+      await remoteFetch(options, `${remote.base}/api/sync/status`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${remote.token}`,
+        },
+        body: JSON.stringify(meta),
+      })
+    } catch {
+      // Best effort: the remote instance may not expose the status endpoint yet.
+    }
+  }
+}
+
 export async function performSync(
   config: ApiConfig,
   input: JsonRecord,
@@ -926,6 +964,7 @@ export async function performSync(
   }
 
   if (direction === 'none') {
+    await recordSyncMeta(config, remote, 'none', true, options)
     return {
       ok: true,
       action,
@@ -951,6 +990,7 @@ export async function performSync(
       target,
     )
     const updatedAt = await pushRemoteState(options, remote, target)
+    await recordSyncMeta(config, remote, direction, true, options)
     return {
       ok: true,
       action,
@@ -988,6 +1028,7 @@ export async function performSync(
   } catch {
     throw new SyncError(503, 'local_save_failed', '保存到本机失败')
   }
+  await recordSyncMeta(config, remote, 'download', true, options)
   return {
     ok: true,
     action,

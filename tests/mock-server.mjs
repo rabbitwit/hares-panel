@@ -30,6 +30,7 @@ await build({
 const { handleApi } = await import(pathToFileURL(outfile).href)
 
 let state = null
+let syncMeta = null
 const assets = new Map()
 
 const config = {
@@ -43,6 +44,12 @@ const config = {
     async putState(data) {
       state = { data, updatedAt: Date.now() }
       return state.updatedAt
+    },
+    async getMeta() {
+      return syncMeta
+    },
+    async putMeta(value) {
+      syncMeta = value
     },
   },
   assets: {

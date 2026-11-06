@@ -4,6 +4,7 @@
  * The Docker image keeps everything under a single mounted directory:
  *
  *   /data/state.json      navigation data written by the admin
+ *   /data/sync-meta.json  last cross-instance sync status
  *   /data/assets/*        uploaded images
  *   /data/session-secret  generated once, used to sign login tokens
  *
@@ -13,7 +14,7 @@
 import { randomBytes } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import type { ApiConfig, AssetStore, StateStore, StoredAsset } from './core'
+import type { ApiConfig, AssetStore, StateStore, StoredAsset, SyncMeta } from './core'
 
 export interface FileRuntimeEnv {
   HARES_DATA_DIR?: string
@@ -34,6 +35,7 @@ export interface FileRuntime {
 }
 
 const STATE_FILE = 'state.json'
+const SYNC_META_FILE = 'sync-meta.json'
 const ASSETS_DIR = 'assets'
 const SECRET_FILE = 'session-secret'
 const DEFAULT_STATE_MAX_BYTES = 16 * 1024 * 1024
@@ -132,6 +134,29 @@ function fileStateStore(file: string): StateStore {
         const updatedAt = Date.now()
         await writeAtomic(file, JSON.stringify({ data, updatedAt }))
         return updatedAt
+      })
+    },
+    async getMeta() {
+      const metaFile = path.join(path.dirname(file), SYNC_META_FILE)
+      let raw: string
+      try {
+        raw = await fs.readFile(metaFile, 'utf8')
+      } catch (error) {
+        if (isMissing(error)) return null
+        throw error
+      }
+      try {
+        const parsed = JSON.parse(raw)
+        return parsed && typeof parsed === 'object' ? (parsed as SyncMeta) : null
+      } catch {
+        return null
+      }
+    },
+    async putMeta(meta) {
+      const metaFile = path.join(path.dirname(file), SYNC_META_FILE)
+      return enqueue(async () => {
+        await fs.mkdir(path.dirname(metaFile), { recursive: true })
+        await writeAtomic(metaFile, JSON.stringify(meta))
       })
     },
   }

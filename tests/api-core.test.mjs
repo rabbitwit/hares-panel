@@ -35,6 +35,7 @@ async function test(name, fn) {
 
 function memoryState() {
   let current = null
+  let meta = null
   return {
     kind: 'kv',
     async getState() {
@@ -43,6 +44,12 @@ function memoryState() {
     async putState(data) {
       current = { data, updatedAt: 1_700_000_000_000 + Math.floor(Math.random() * 1000) }
       return current.updatedAt
+    },
+    async getMeta() {
+      return meta
+    },
+    async putMeta(value) {
+      meta = value
     },
   }
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -45,7 +45,7 @@ const SYNC_MODES: Array<{ value: CloudSyncMode; label: string; hint: string }> =
   {
     value: 'download',
     label: '远端 → 本机',
-    hint: '强制用远端数据覆盖本机。',
+    hint: '强制用远端数据覆盖本机。适合内网实例手动拉取公网实例的更新（本机无需暴露到公网）。',
   },
 ]
 
@@ -70,6 +70,15 @@ export function SyncSettingsPanel() {
   const error = useCloudStore((state) => state.error)
   const token = useCloudStore((state) => state.token)
   const reload = useCloudStore((state) => state.reload)
+  const info = useCloudStore((state) => state.info)
+  const syncMeta = useCloudStore((state) => state.syncMeta)
+  const loadSyncMeta = useCloudStore((state) => state.loadSyncMeta)
+
+  // Cloud deployments act as read-only sync targets; only self-hosted (Docker /
+  // LAN) instances initiate sync and show the full address/password form.
+  const isCloud = Boolean(
+    info?.runtime && ['cloudflare-workers', 'vercel', 'edgeone'].includes(info.runtime),
+  )
 
   const [remoteUrl, setRemoteUrl] = useState('')
   const [password, setPassword] = useState('')
@@ -87,6 +96,13 @@ export function SyncSettingsPanel() {
     setResult(null)
     useCloudStore.getState().clearError()
   }
+
+  // Cloud targets have no form; load their read-only sync status on open.
+  useEffect(() => {
+    if (isCloud && status === 'connected') {
+      void loadSyncMeta()
+    }
+  }, [isCloud, status, loadSyncMeta])
 
   const runSync = async (action: 'test' | 'sync') => {
     if (!remoteUrl.trim()) {
@@ -154,24 +170,25 @@ export function SyncSettingsPanel() {
     <div className="space-y-5">
       <PanelHeader
         title="实例同步"
-        description="在本机实例与另一台实例（Cloudflare Worker / Vercel / EdgeOne / Docker）之间双向同步导航数据与图片。两个实例各自独立运行，本页面用另一台实例的地址与管理员密码发起同步。"
+        description="在本机实例与另一台实例（Cloudflare Worker / Vercel / EdgeOne / Docker）之间同步导航数据与图片。同步由本机发起：填另一台的地址与管理员密码即可，另一台无需反向访问本机。"
       />
 
-      <SettingsSection
-        title="同步目标"
-        description="填写另一台实例的公开地址和它的 ADMIN_PASSWORD，测试确认可连接后再执行同步。"
-      >
-        <div className="space-y-3">
-          <div className="relative">
-            <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={remoteUrl}
-              onChange={(event) => setRemoteUrl(event.target.value)}
-              placeholder="https://你的另一台实例.example.com"
-              autoComplete="url"
-              spellCheck={false}
-              className="pl-9"
-              disabled={running}
+      {!isCloud && (
+        <SettingsSection
+          title="同步目标"
+          description="填写另一台实例的地址和它的 ADMIN_PASSWORD，测试确认可连接后再执行同步。填的地址是本机能访问到的地址（内网可填内网地址，远端在公网可填公网地址）。"
+        >
+          <div className="space-y-3">
+            <div className="relative">
+              <Globe className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={remoteUrl}
+                onChange={(event) => setRemoteUrl(event.target.value)}
+                placeholder="https://你的另一台实例.example.com"
+                autoComplete="url"
+                spellCheck={false}
+                className="pl-9"
+                disabled={running}
             />
           </div>
           <div className="relative">
@@ -253,7 +270,55 @@ export function SyncSettingsPanel() {
             <span className="text-[11px] text-muted-foreground">请先在「服务端与账号」中登录本机。</span>
           )}
         </div>
-      </SettingsSection>
+        </SettingsSection>
+      )}
+
+      {isCloud && (
+        <SettingsSection
+          title="同步状态"
+          description="本实例部署在公网，作为同步目标只读展示最近一次与内网实例的同步结果。"
+          actions={
+            <button
+              type="button"
+              onClick={() => void loadSyncMeta()}
+              className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+            >
+              刷新
+            </button>
+          }
+        >
+          {syncMeta ? (
+            <div className="space-y-2 text-[11px] leading-relaxed">
+              <div className="flex items-center gap-2">
+                {syncMeta.success ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                )}
+                <span className="font-medium">
+                  {syncMeta.success ? '已与内网实例同步' : '最近一次同步失败'}
+                </span>
+              </div>
+              <div className="text-muted-foreground">
+                上次同步：{new Date(syncMeta.lastSyncAt).toLocaleString('zh-CN')}
+                {' · '}
+                {syncMeta.direction === 'upload'
+                  ? '本机 → 远端'
+                  : syncMeta.direction === 'download'
+                    ? '远端 → 本机'
+                    : '无需同步'}
+              </div>
+              {syncMeta.error && (
+                <div className="text-amber-600 dark:text-amber-300">{syncMeta.error}</div>
+              )}
+            </div>
+          ) : (
+            <div className="text-[11px] text-muted-foreground">
+              尚未与内网实例同步过。请在内网实例的「实例同步」中填本实例地址并执行同步。
+            </div>
+          )}
+        </SettingsSection>
+      )}
 
       {result && (
         <SettingsSection
@@ -390,7 +455,7 @@ export function SyncSettingsPanel() {
           使用提示
         </div>
         <ul className="list-disc space-y-1 pl-4">
-          <li>同步需要两台实例都能通过公网访问，且都配置了 ADMIN_PASSWORD。</li>
+          <li>同步由本机发起：只需要本机能够访问远端地址，远端无需反向访问本机，本机也不必暴露到公网。例如内网实例可单向拉取公网实例的数据。</li>
           <li>「自动判断」按更新时间比较，把较新的一方覆盖较旧的一方；若两侧同时被编辑会出现冲突，请用「上传 / 下载」手动选择。</li>
           <li>图片对象在各平台独立存储，同步图片会真实传输图片文件；关闭「同步图片」则只同步地址。</li>
           <li>同步会用一端的数据覆盖另一端，操作前建议先在「备份与恢复」导出一份快照。</li>

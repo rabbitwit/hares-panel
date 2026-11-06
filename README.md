@@ -33,7 +33,7 @@ Hares-Panel 是一个面向 NAS、家庭服务器和云主机的导航首页。�
 | 管理员认证 | 密码来自环境变量 `ADMIN_PASSWORD`；HMAC 签名令牌，7 天滑动有效期（访问自动续期） |
 | 个人资料 | 管理员可自定义头像与显示名称，支持图片 URL、本地上传或图库引用，显示在右上角账户菜单 |
 | 备份恢复 | 导出/导入 JSON 快照，自动保存到服务端；支持自动识别 FlatNas / Sun-Panel 备份并导入分组与卡片；图库只保存图片地址 |
-| 实例同步 | 在本机与另一台实例（Cloudflare Worker / Vercel / EdgeOne / Docker）之间双向同步导航数据与图片；自动比较更新时间，也支持强制上传/下载 |
+| 实例同步 | 在本机与另一台实例（Cloudflare Worker / Vercel / EdgeOne / Docker）之间同步导航数据与图片；由本机发起，自动比较更新时间，也支持强制上传/下载；内网实例可单向拉取公网实例，无需暴露公网 |
 | 自定义 | 自定义 CSS、JS、页脚 HTML、Logo 上传或 URL |
 | 系统状态 | 浏览器可读取的本机 CPU 核心数、设备内存、存储、网络、电池信息 |
 
@@ -235,7 +235,7 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 | `GET` | `/api/update?current=0.1.1` | 否 | 对比 Docker Hub / GitHub 的最新版本，返回是否有更新（成功结果缓存约 12 小时） |
 | `POST` | `/api/login` | 密码 | 校验 `ADMIN_PASSWORD`，返回 HMAC 令牌（按 IP 限流） |
 | `POST` | `/api/session/refresh` | Bearer | 续期登录令牌，返回新的 7 天令牌与到期时间 |
-| `POST` | `/api/sync` | Bearer | 与其他实例双向同步导航数据与图片；自动比较更新时间或强制上传/下载 |
+| `POST` | `/api/sync` | Bearer | 由调用方发起与其他实例同步导航数据与图片；自动比较更新时间或强制上传/下载（本机只需能访问远端，无需公网可达） |
 | `GET` | `/api/state` | 否 | 公开投影（不含访客隐藏的卡片/分组）；关闭公开访问时返回配置与空内容（`locked`） |
 | `GET` | `/api/state?full=1` | Bearer | 完整数据，仅管理员 |
 | `PUT` | `/api/state` | Bearer | 覆盖保存，Cloud 平台默认上限 8 MB（Docker 默认 16 MB） |

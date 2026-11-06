@@ -1,4 +1,4 @@
-import type { ApiConfig, AssetStore, StateStore, StoredAsset } from './core'
+import type { ApiConfig, AssetStore, StateStore, StoredAsset, SyncMeta } from './core'
 
 /**
  * Minimal structural interface for `@edgeone/pages-blob`'s `Store`.
@@ -25,6 +25,7 @@ export interface EdgeOneEnv {
 }
 
 const STATE_KEY = 'state/default.json'
+const STATE_META_KEY = 'state/sync-meta.json'
 const ASSET_PREFIX = 'assets/'
 
 /** EdgeOne's Node Functions accept requests up to 6 MB. */
@@ -50,6 +51,13 @@ function edgeOneStateStore(store: EdgeOneBlobStore): StateStore {
       const updatedAt = Date.now()
       await store.setJSON(STATE_KEY, { data, updatedAt })
       return updatedAt
+    },
+    async getMeta() {
+      const value = await store.get(STATE_META_KEY, { type: 'json', consistency: 'strong' })
+      return value && typeof value === 'object' ? (value as SyncMeta) : null
+    },
+    async putMeta(meta) {
+      await store.setJSON(STATE_META_KEY, meta)
     },
   }
 }

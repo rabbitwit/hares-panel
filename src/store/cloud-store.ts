@@ -5,10 +5,12 @@ import {
   CloudApiError,
   cloudLogin,
   fetchCloudState,
+  fetchSyncMeta,
   getCloudHealth,
   pushCloudState,
   refreshCloudSession,
   type CloudHealth,
+  type CloudSyncMeta,
   type CloudSession,
 } from '@/lib/cloud'
 import { useSessionStore } from '@/store/session-store'
@@ -22,6 +24,8 @@ interface CloudState {
   token: string | null
   expiresAt: number | null
   lastSyncAt: number | null
+  /** Last cross-instance sync status, shown read-only on the target/public side. */
+  syncMeta: CloudSyncMeta | null
   busy: boolean
   error: string | null
   loaded: boolean
@@ -35,6 +39,8 @@ interface CloudState {
   push: () => Promise<boolean>
   /** Re-fetch the full state from the server (used after a sync download or an import). */
   reload: () => Promise<boolean>
+  /** Refresh this instance's last cross-instance sync status. */
+  loadSyncMeta: () => Promise<void>
   disconnect: () => void
   clearError: () => void
 }
@@ -75,6 +81,7 @@ export const useCloudStore = create<CloudState>()(
       token: null,
       expiresAt: null,
       lastSyncAt: null,
+      syncMeta: null,
       busy: false,
       error: null,
       loaded: false,
@@ -266,6 +273,18 @@ export const useCloudStore = create<CloudState>()(
         } catch (error) {
           set({ busy: false, error: errorMessage(error, '重新读取服务端数据失败') })
           return false
+        }
+      },
+
+      loadSyncMeta: async () => {
+        const { token, status } = get()
+        if (!token || status !== 'connected') return
+        try {
+          const meta = await fetchSyncMeta(token)
+          set({ syncMeta: meta })
+        } catch {
+          // Non-fatal: the public target may be an older version without the
+          // status endpoint; just leave syncMeta unchanged.
         }
       },
 

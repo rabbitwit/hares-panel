@@ -8,11 +8,12 @@
 
 ### 新增
 
-- **实例同步**（服务端与账号 → 实例同步）：在本机与另一台 Hares-Panel 实例（Cloudflare Worker / Vercel / EdgeOne / Docker）之间双向同步导航数据与图片。
-  - 支持 `自动判断`（比较两端更新时间，把较新一方复制到较旧一方）、`强制上传`、`强制下载` 三种模式。
+- **实例同步**（服务端与账号 → 实例同步）：在本机与另一台 Hares-Panel 实例（Cloudflare Worker / Vercel / EdgeOne / Docker）之间同步导航数据与图片，同步由本机发起。
+  - 支持 `自动判断`（比较两端更新时间，把较新一方复制到较旧一方）、`强制上传`、`强制下载` 三种模式；内网实例可填公网实例地址单向拉取，无需将本机暴露到公网。
   - 服务端通过公共 API 登录目标实例完成同步，规避浏览器 CORS 限制，Docker / Workers / Vercel / EdgeOne 走同一套代码。
   - 可选是否同步图库图片，同步完成后自动重新拉取服务端最新状态。
-  - 新增 `/api/sync` 接口、`server/sync.ts` 同步核心与 `tests/sync.test.mjs` 测试。
+  - 新增 `/api/sync`、`/api/sync/status` 接口、`server/sync.ts` 同步核心与 `tests/sync.test.mjs` 测试。
+  - 公网部署（Cloudflare / Vercel / EdgeOne）作为同步目标时只读展示「同步状态」（最近一次同步时间、成功与否、方向），不显示地址/密码表单；同步状态独立持久化于各存储后端（Docker `sync-meta.json`、KV、D1、Redis、EdgeOne Blob）。
 - **必应每日壁纸**：内置壁纸新增 `必应每日壁纸` 选项，可从管理面板配置必应壁纸接口地址（默认 `api.bimg.cc/today`，兼容 `bing.xinac.net`，也支持任意自建服务）。
   - 新增同源代理 `/api/wallpaper/bing`，绕过上游 CORS 限制；接受管理员配置的任意 HTTP(S) 接口（含自建服务），仅返回单张图片地址，避免成为通用开放代理。
   - 如需自建服务可以到该项目仓库自行搭建 [[bing-wallpaper-api]](https://github.com/flow2000/bing-wallpaper-api)
@@ -25,11 +26,15 @@
 
 - 移动端优化：浮动停靠栏（Floating Dock）在小屏下仅在编辑模式显示，网络切换按钮改为 `sm` 以上屏幕显示，避免遮挡卡片。
 - 卡片圆角与图标圆角设置区重构，图标圆角改为“开关 + 圆角大小”两级控制。
+- 飞牛 fnOS 应用包改进：安装向导新增「管理员密码」可选设置；卸载向导让用户选择「保留或删除数据」，符合官方尊重用户数据的推荐做法。
+- 飞牛 fnOS 应用包版本号随 `package.json` 同步（`manifest` 与 `package-lock.json` 保持一致）。
 
 ### 修复
 
 - 内置渐变壁纸叠加照片遮罩导致毛玻璃失效的问题，现已按壁纸类型分别处理遮罩浓度与光斑。
 - 移动端下右上角管理员头像右侧间距过大、不整齐不对称的问题。
+- 飞牛 fnOS 应用包多个生命周期脚本（卸载/升级/配置）换行符被写成字面量 `\n` 导致脚本损坏，现已修复。
+- 必应壁纸接口 `api.bimg.cc` 数组格式解析的测试断言错误（比较了对象而非 URL），现已修正。
 
 ---
 
