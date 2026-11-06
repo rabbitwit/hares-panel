@@ -535,7 +535,7 @@ await test('bing wallpaper proxy reads the api.bimg.cc array format', async () =
   )
   const body = await response.json()
   assert.equal(response.status, 200)
-  assert.equal(seen[0], endpoint)
+  assert.equal(seen[0].url, endpoint)
   assert.equal(body.url, 'https://cn.bing.com/th?id=OHR.Example_1920x1080.jpg')
 })
 
