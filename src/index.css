@@ -360,16 +360,39 @@
    * does the work instead: it smears the photo's detail inside the tile and the
    * edge becomes readable regardless of whether the photo is bright or dark.
    *
+   * Blur lives on ::before, not the tile itself: WebKit often fails to paint
+   * child images (favicons, dark app icons) when backdrop-filter is on the same
+   * element, which showed up on mobile as an empty brown tile.
+   *
    * The top rim highlight belongs to the glass recipe (`.nav-glass-tile.is-glass`)
    * and is deliberately absent here: without glass it draws a white line along
    * the top edge of every icon tile.
    */
   .nav-icon-tile {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.24);
-    -webkit-backdrop-filter: blur(10px) saturate(115%);
-    backdrop-filter: blur(10px) saturate(115%);
     box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.75);
+  }
+
+  .nav-icon-tile > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .nav-icon-tile::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      -webkit-backdrop-filter: blur(10px) saturate(115%);
+      backdrop-filter: blur(10px) saturate(115%);
+    }
   }
 
   :root:not(.dark) .nav-icon-tile {
@@ -410,11 +433,14 @@
 
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     .nav-glass-tile.is-glass {
-      -webkit-backdrop-filter: blur(var(--card-blur, 14px)) brightness(1.22);
-      backdrop-filter: blur(var(--card-blur, 14px)) brightness(1.22);
       background: rgba(255, 255, 255, 0.15);
       border-color: rgba(255, 255, 255, 0.3);
       box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+
+    .nav-glass-tile.is-glass::before {
+      -webkit-backdrop-filter: blur(var(--card-blur, 14px)) brightness(1.22);
+      backdrop-filter: blur(var(--card-blur, 14px)) brightness(1.22);
     }
 
     .nav-card-glass.is-card-glass,
@@ -432,11 +458,14 @@
     }
 
     :root:not(.dark) .nav-glass-tile.is-glass {
-      -webkit-backdrop-filter: blur(var(--card-blur, 14px));
-      backdrop-filter: blur(var(--card-blur, 14px));
       background: rgba(255, 255, 255, 0.28);
       border-color: rgba(255, 255, 255, 0.6);
       box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.22);
+    }
+
+    :root:not(.dark) .nav-glass-tile.is-glass::before {
+      -webkit-backdrop-filter: blur(var(--card-blur, 14px));
+      backdrop-filter: blur(var(--card-blur, 14px));
     }
 
     :root:not(.dark) .nav-card-glass.is-card-glass,

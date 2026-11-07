@@ -41,6 +41,14 @@ export function NavIcon({
     ? gallery.find((asset) => asset.id === sourceIcon.slice('gallery:'.length))?.dataUrl ?? ''
     : sourceIcon
 
+  const boxStyle = {
+    width: size,
+    height: size,
+    maxWidth: size,
+    maxHeight: size,
+    ...(radius != null ? { borderRadius: radius } : {}),
+  }
+
   if (resolvedIcon && !imageFailed) {
     if (resolvedIcon.startsWith('data:image/') || isImageSource(resolvedIcon)) {
       return (
@@ -53,11 +61,11 @@ export function NavIcon({
           loading="lazy"
           onError={() => setImageFailed(true)}
           className={cn(
-            'object-contain drop-shadow-sm',
+            'shrink-0 object-contain drop-shadow-sm',
             imageClassName,
             className,
           )}
-          style={{ width: size, height: size, ...(radius != null ? { borderRadius: radius } : {}) }}
+          style={boxStyle}
         />
       )
     }
@@ -73,13 +81,21 @@ export function NavIcon({
       // swapping it for a lookalike would ignore what the user picked.
       const inheritColor = silhouette && isMonochromeIcon(resolvedIcon)
       return (
-        <Icon
-          icon={iconifyId(resolvedIcon)}
-          width={size}
-          height={size}
-          style={{ color: inheritColor ? undefined : iconColor || undefined }}
-          className={cn('shrink-0 drop-shadow-sm', className)}
-        />
+        <span
+          className={cn(
+            'inline-flex shrink-0 items-center justify-center overflow-hidden [&_svg]:h-full [&_svg]:w-full',
+            className,
+          )}
+          style={boxStyle}
+        >
+          <Icon
+            icon={iconifyId(resolvedIcon)}
+            width={size}
+            height={size}
+            style={{ color: inheritColor ? undefined : iconColor || undefined }}
+            className="drop-shadow-sm"
+          />
+        </span>
       )
     }
 

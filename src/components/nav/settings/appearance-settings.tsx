@@ -438,13 +438,13 @@ export function AppearanceSettingsPanel() {
       <SettingsSection title="顶部品牌与时钟">
         <SwitchRow
           label="显示站点名称"
-          hint="在搜索栏上方显示站点名称文字。"
+          hint="在搜索栏上方显示站点名称文字，可与 Logo 图标分开开关。"
           checked={config.showLogo}
           onCheckedChange={(value) => updateConfig({ showLogo: value })}
         />
         <SwitchRow
           label="显示 Logo 图标"
-          hint="在搜索栏上方显示站点 Logo 图标；关闭后只保留名称文字。"
+          hint="在搜索栏上方显示站点 Logo 图标，可与站点名称分开开关。"
           checked={config.showLogoMark}
           onCheckedChange={(value) => updateConfig({ showLogoMark: value })}
         />

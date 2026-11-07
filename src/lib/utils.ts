@@ -33,9 +33,18 @@ export function formatTime(date: Date, options: { seconds?: boolean; use24Hour?:
   }).format(date)
 }
 
+const WEEKDAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+
+export function formatDateParts(date: Date) {
+  return {
+    day: `${date.getMonth() + 1}月${date.getDate()}日`,
+    weekday: WEEKDAYS[date.getDay()],
+  }
+}
+
 export function formatDate(date: Date) {
-  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${weekdays[date.getDay()]}`
+  const { day, weekday } = formatDateParts(date)
+  return `${day} ${weekday}`
 }
 
 export function getDomain(url: string) {

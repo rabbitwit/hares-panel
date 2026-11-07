@@ -1,6 +1,5 @@
 import { useNavigate } from 'react-router-dom'
 import { Check, Cloud, Globe2, House, LayoutDashboard, LogOut, Palette, PencilLine, Settings2, UserRound } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -162,14 +161,14 @@ export function TopControls() {
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
-        <Button
+        <button
           type="button"
           onClick={() => navigate('/login')}
-          className="nav-item-surface nav-surface-ink h-10 gap-2 rounded-full bg-transparent px-4 shadow-nav hover:bg-foreground/15"
+          className="nav-item-surface nav-surface-ink inline-flex h-10 items-center gap-2 rounded-full px-4 shadow-nav outline-none transition-colors hover:bg-foreground/15 focus-visible:ring-2 focus-visible:ring-foreground/30"
         >
           <UserRound className="h-4 w-4" />
           <span className="text-xs font-medium">登录</span>
-        </Button>
+        </button>
       )}
     </div>
   )
