@@ -89,6 +89,80 @@ export function NavBackground() {
     }
   }, [config.wallpaper, gallery, isLight, bingUrl])
 
+  // Adapt the nav text colour to the wallpaper. Text never gets a glyph halo --
+  // a text-shadow renders as a dark rim around every letter, which reads as a
+  // black slab inside the cards. Contrast comes from the ink colour and the pane.
+  useEffect(() => {
+    const root = document.documentElement
+    const bing = config.wallpaper.type === 'bing'
+    root.classList.toggle('wallpaper-bing', bing)
+
+    const applyInk = (dark: boolean) => {
+      root.style.setProperty('--nav-ink', dark ? '#f2f4fa' : '#141726')
+    }
+    let alive = true
+    let image: HTMLImageElement | null = null
+
+    if (bing || wallpaper.type === 'preset') {
+      // Presets ship a matching light/dark variant. Bing uses the same rule so a
+      // bright sky behind a dark subject cannot invert the overlay into fog.
+      applyInk(!isLight)
+      return () => {
+        alive = false
+        root.classList.remove('wallpaper-bing')
+      }
+    }
+
+    const match = /url\(["']?([^"')]+)["']?\)/.exec(wallpaper.css)
+    const src = match?.[1]
+    if (!src) {
+      applyInk(true)
+      return () => {
+        alive = false
+        root.classList.remove('wallpaper-bing')
+      }
+    }
+
+    image = new Image()
+    image.crossOrigin = 'anonymous'
+    image.onload = () => {
+      if (!alive) return
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = image!.naturalWidth
+        canvas.height = image!.naturalHeight
+        const context = canvas.getContext('2d', { willReadFrequently: true })
+        if (context) {
+          context.drawImage(image!, 0, 0)
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data
+          let sum = 0
+          let count = 0
+          for (let index = 0; index < pixels.length; index += 40) {
+            sum += 0.299 * pixels[index] + 0.587 * pixels[index + 1] + 0.114 * pixels[index + 2]
+            count += 1
+          }
+          applyInk(count > 0 ? sum / count < 110 : true)
+        } else {
+          applyInk(true)
+        }
+      } catch {
+        applyInk(true)
+      }
+    }
+    image.onerror = () => {
+      if (alive) applyInk(true)
+    }
+    image.src = src
+    return () => {
+      alive = false
+      root.classList.remove('wallpaper-bing')
+      if (image) {
+        image.onload = null
+        image.onerror = null
+      }
+    }
+  }, [wallpaper, config.wallpaper.type, isLight])
+
   const waves = wallpaper.preset.waves
   const overlayAlpha = Math.min(100, Math.max(0, config.overlayOpacity)) / 100
 
@@ -99,12 +173,17 @@ export function NavBackground() {
   // cards actually refract the wallpaper, and the gradient waves are blurred behind
   // the content so the backdrop filter has real detail to work with.
   const preset = wallpaper.type === 'preset'
+  const bing = config.wallpaper.type === 'bing'
   const glassPreset = preset && config.glassEffect
   const overlayScale = preset ? (glassPreset ? 0.45 : 0.7) : 1
-  const lightBase = preset ? 0.06 : 0.08
-  const darkOverlay = Math.max(0, Math.min(0.78, overlayAlpha) * overlayScale)
-  const lightOverlay = Math.max(0, Math.min(0.82, overlayAlpha * overlayScale + lightBase))
-  const lightScrim = preset ? (glassPreset ? 0.22 : 0.34) : 0.4
+  // Bing copy carries neither a glyph halo nor a plate, so the theme veil itself
+  // guarantees contrast: a slightly higher floor that dims the photo uniformly
+  // (dark veil on dark theme, white on light) without touching its colours.
+  const overlayFloor = bing ? 0.32 : 0
+  const lightBase = preset ? 0.05 : 0
+  const darkOverlay = Math.max(overlayFloor, Math.min(0.78, overlayAlpha) * overlayScale)
+  const lightOverlay = Math.max(overlayFloor, Math.min(0.82, overlayAlpha * overlayScale + lightBase))
+  const lightScrim = preset ? (glassPreset ? 0.18 : 0.24) : 0.22
   const darkScrim = preset ? (glassPreset ? 0.24 : 0.34) : 0.4
 
   const presetBokeh = useMemo(() => bokehLayer(waves), [waves])

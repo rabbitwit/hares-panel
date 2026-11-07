@@ -49,6 +49,10 @@ const configSchema = z
     customCss: z.string().max(200_000),
     customJs: z.string().max(200_000),
     defaultOpenMode: openModeSchema,
+    syncRemoteUrl: z.string().max(2000),
+    syncPassword: z.string().max(1000),
+    syncMode: z.enum(['auto', 'upload', 'download']),
+    syncIncludeAssets: z.boolean(),
   })
   .partial()
 

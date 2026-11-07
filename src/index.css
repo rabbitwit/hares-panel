@@ -31,6 +31,7 @@
     --nav-border: 0 0% 100%;
     --nav-border-alpha: 0.55;
     --nav-tile-rgb: 15 23 42;
+    --nav-ink: #141726;
   }
 
   .dark {
@@ -60,6 +61,7 @@
     --nav-border: 0 0% 100%;
     --nav-border-alpha: 0.1;
     --nav-tile-rgb: 255 255 255;
+    --nav-ink: #f2f4fa;
   }
 
   * {
@@ -164,45 +166,216 @@
     border-color: rgba(15, 23, 42, 0.08);
   }
 
+  /*
+   * Search pill. The blur used to be hardcoded here, so the field looked
+   * frosted whether or not 毛玻璃 was on. It now follows the same switch as the
+   * cards and menus: a theme-coloured solid bar at rest, frosted glass when on.
+   * No inset top highlight outside glass mode -- it reads as a bright rim.
+   */
   .nav-search {
-    background: rgba(9, 13, 34, 0.44);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow:
-      0 16px 40px -22px rgba(0, 0, 0, 0.6),
-      inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(18px) saturate(120%);
-    -webkit-backdrop-filter: blur(18px) saturate(120%);
+    background: hsl(var(--card) / 0.94);
+    border: 1px solid hsl(var(--border) / 0.9);
+    box-shadow: 0 16px 40px -22px rgba(15, 23, 42, 0.35);
   }
 
-  :root:not(.dark) .nav-search {
-    background: rgba(255, 255, 255, 0.64);
-    border-color: rgba(15, 23, 42, 0.12);
-    box-shadow:
-      0 16px 40px -22px rgba(30, 41, 59, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  .dark .nav-search {
+    box-shadow: 0 16px 40px -22px rgba(0, 0, 0, 0.6);
   }
 
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    html.nav-glass .nav-search {
+      background: hsl(var(--card) / 0.55);
+      border-color: hsl(var(--border) / 0.6);
+      -webkit-backdrop-filter: blur(20px) saturate(135%);
+      backdrop-filter: blur(20px) saturate(135%);
+    }
+
+    /*
+     * The light theme pane gets the same brightness lift as the card glass:
+     * plain white at low alpha over a dark wallpaper turns into a grey slab,
+     * which then swallows the dark placeholder text.
+     */
+    html.nav-glass:not(.dark) .nav-search {
+      background: hsl(var(--card) / 0.42);
+      -webkit-backdrop-filter: blur(20px) saturate(125%) brightness(1.12);
+      backdrop-filter: blur(20px) saturate(125%) brightness(1.12);
+    }
+  }
+
+  /*
+   * Resting surface for cards and small controls on the wallpaper.
+   *
+   * Low-alpha white composited over a dark wallpaper stays dark, so a plain
+   * `rgba(255,255,255,0.09)` pane reads as a black slab with grey text on it.
+   * The pane therefore lifts the backdrop itself with `brightness()` (plus blur
+   * for the frosted texture and a white wash on top), which keeps the
+   * wallpaper's own hue but makes the card read as light glass.
+   *
+   * No top rim highlight here: outside the glassmorphism mode it shows up as a
+   * bright white line along the top edge of every card.
+   */
   .nav-item-surface {
-    background: rgba(255, 255, 255, 0.075);
-    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    .nav-item-surface {
+      -webkit-backdrop-filter: blur(18px) saturate(125%) brightness(1.28);
+      backdrop-filter: blur(18px) saturate(125%) brightness(1.28);
+    }
   }
 
   :root:not(.dark) .nav-item-surface {
-    background: rgba(255, 255, 255, 0.5);
-    border-color: rgba(15, 23, 42, 0.07);
+    background: rgba(255, 255, 255, 0.58);
+    border-color: rgba(15, 23, 42, 0.08);
   }
 
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    :root:not(.dark) .nav-item-surface {
+      -webkit-backdrop-filter: blur(18px) saturate(125%) brightness(1.08);
+      backdrop-filter: blur(18px) saturate(125%) brightness(1.08);
+    }
+  }
+
+  /*
+   * Floating menus: the card context menu plus the search-engine, network and
+   * account dropdowns. They previously each hardcoded their own colour (the
+   * context menu was fixed to dark navy), so they ignored both the light theme
+   * and the 毛玻璃 setting.
+   *
+   * One recipe for all of them: the theme popover colour at rest, and a
+   * translucent frosted pane when glass is on. `nav-glass` is set on <html>
+   * from config.glassEffect so a single rule covers every menu.
+   */
+  .nav-menu-surface {
+    background: hsl(var(--popover));
+    border: 1px solid hsl(var(--border) / 0.9);
+    color: hsl(var(--popover-foreground));
+    box-shadow:
+      0 20px 48px -20px rgba(15, 23, 42, 0.35),
+      0 2px 8px -4px rgba(15, 23, 42, 0.18);
+  }
+
+  .dark .nav-menu-surface {
+    box-shadow:
+      0 20px 48px -18px rgba(0, 0, 0, 0.75),
+      0 2px 8px -4px rgba(0, 0, 0, 0.5);
+  }
+
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    html.nav-glass .nav-menu-surface {
+      background: hsl(var(--popover) / 0.72);
+      -webkit-backdrop-filter: blur(22px) saturate(140%);
+      backdrop-filter: blur(22px) saturate(140%);
+    }
+
+    html.nav-glass:not(.dark) .nav-menu-surface {
+      background: hsl(var(--popover) / 0.78);
+    }
+  }
+
+  /*
+   * Edit-mode "add" affordance (new card / new group). A filled tile at card
+   * size reads as a real card and competes with the content, so this is a ghost
+   * slot instead: dashed outline, near-transparent fill, and the theme's primary
+   * colour on hover.
+   *
+   * In icon mode the slot has no fill at all, so the label sits directly on the
+   * photo and needs the wallpaper-aware ink plus a halo. The `-fill` variants
+   * used by the horizontal layouts carry their own pane and override that below.
+   */
+  .nav-add-tile {
+    color: color-mix(in srgb, var(--nav-ink, hsl(var(--foreground))) 82%, transparent);
+    transition:
+      border-color 200ms ease,
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+
+  /*
+   * Mixing toward --nav-ink (rather than a fixed white) keeps the hover label
+   * readable in both directions: on a dark wallpaper the ink is near-white, so
+   * the mix stays light; on a bright photo the ink is near-black, so the mix
+   * stays dark.
+   */
+  .nav-add-tile:hover {
+    color: color-mix(in srgb, hsl(var(--primary)) 60%, var(--nav-ink, hsl(var(--foreground))));
+  }
+
+  /* Icon mode draws only the icon tile; the surrounding slot stays invisible. */
+  .nav-add-tile-mark {
+    border: 1px dashed color-mix(in srgb, currentColor 34%, transparent);
+    transition:
+      border-color 200ms ease,
+      background-color 200ms ease,
+      transform 200ms ease;
+  }
+
+  .nav-add-tile:hover .nav-add-tile-mark {
+    border-color: color-mix(in srgb, currentColor 62%, transparent);
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+
+  /* Horizontal layouts get an empty slot that matches the real card panes. */
+  .nav-add-tile-fill {
+    border: 1px dashed rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.08);
+    -webkit-backdrop-filter: blur(18px) saturate(125%) brightness(1.2);
+    backdrop-filter: blur(18px) saturate(125%) brightness(1.2);
+  }
+
+  .nav-add-tile-fill:hover {
+    border-color: color-mix(in srgb, hsl(var(--primary)) 65%, transparent);
+    background: color-mix(in srgb, hsl(var(--primary)) 14%, transparent);
+  }
+
+  /* The light pane is opaque enough that its composite stays pale even over a
+     dark photo, so it uses the theme ink instead of the wallpaper ink. */
+  :root:not(.dark) .nav-add-tile-fill {
+    border-color: rgba(15, 23, 42, 0.16);
+    background: rgba(255, 255, 255, 0.62);
+    color: hsl(var(--foreground) / 0.75);
+    text-shadow: none;
+  }
+
+  :root:not(.dark) .nav-add-tile-fill:hover {
+    border-color: color-mix(in srgb, hsl(var(--primary)) 50%, transparent);
+    background: color-mix(in srgb, hsl(var(--primary)) 9%, transparent);
+    color: hsl(var(--primary));
+  }
+
+  .nav-add-tile-fill .nav-add-tile-mark {
+    border: 0;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+
+  .nav-add-tile-fill:hover .nav-add-tile-mark {
+    background: color-mix(in srgb, currentColor 14%, transparent);
+  }
+
+  /*
+   * The icon tile's own fill is a 7-8% wash (set inline with the item accent), so
+   * on a detailed photo the tile barely separates from its background. The blur
+   * does the work instead: it smears the photo's detail inside the tile and the
+   * edge becomes readable regardless of whether the photo is bright or dark.
+   *
+   * The top rim highlight belongs to the glass recipe (`.nav-glass-tile.is-glass`)
+   * and is deliberately absent here: without glass it draws a white line along
+   * the top edge of every icon tile.
+   */
   .nav-icon-tile {
     background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.11);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      0 12px 24px -18px rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    -webkit-backdrop-filter: blur(10px) saturate(115%);
+    backdrop-filter: blur(10px) saturate(115%);
+    box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.75);
   }
 
   :root:not(.dark) .nav-icon-tile {
     background: rgba(255, 255, 255, 0.72);
-    border-color: rgba(15, 23, 42, 0.06);
+    border-color: rgba(15, 23, 42, 0.14);
+    box-shadow: 0 10px 24px -18px rgba(15, 23, 42, 0.35);
   }
 
   /*
@@ -237,8 +410,8 @@
 
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     .nav-glass-tile.is-glass {
-      -webkit-backdrop-filter: blur(var(--card-blur, 14px));
-      backdrop-filter: blur(var(--card-blur, 14px));
+      -webkit-backdrop-filter: blur(var(--card-blur, 14px)) brightness(1.22);
+      backdrop-filter: blur(var(--card-blur, 14px)) brightness(1.22);
       background: rgba(255, 255, 255, 0.15);
       border-color: rgba(255, 255, 255, 0.3);
       box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
@@ -246,8 +419,8 @@
 
     .nav-card-glass.is-card-glass,
     .nav-card-glass.is-card-glass-on-hover:hover {
-      -webkit-backdrop-filter: blur(var(--card-blur, 14px));
-      backdrop-filter: blur(var(--card-blur, 14px));
+      -webkit-backdrop-filter: blur(var(--card-blur, 14px)) brightness(1.22);
+      backdrop-filter: blur(var(--card-blur, 14px)) brightness(1.22);
       background: rgba(255, 255, 255, 0.15);
       border-color: rgba(255, 255, 255, 0.3);
       box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
@@ -317,12 +490,96 @@
     pointer-events: none;
   }
 
-  .text-shadow-nav {
-    text-shadow: 0 2px 18px rgba(0, 0, 0, 0.35);
+  .nav-ink {
+    color: var(--nav-ink, hsl(var(--foreground)));
   }
 
-  :root:not(.dark) .text-shadow-nav {
-    text-shadow: 0 1px 10px rgba(255, 255, 255, 0.6);
+  .nav-ink-soft {
+    color: color-mix(in srgb, var(--nav-ink, hsl(var(--foreground))) 58%, transparent);
+  }
+
+  /*
+   * Card copy that sits directly on the wallpaper: icon and transparent modes
+   * have no pane at all, and in dark theme the card pane is a mere 8% white veil,
+   * so the theme foreground disappears over a bright Bing photo. The ink follows
+   * the wallpaper luminance detected in NavBackground, and the halo is repeated
+   * at full strength because a single wide, low-alpha glow cannot rescue text from
+   * a patch of the photo that happens to match its own colour.
+   */
+  .nav-ink-on-wallpaper {
+    color: var(--nav-ink, hsl(var(--foreground)));
+  }
+
+  .nav-ink-on-wallpaper-soft {
+    color: color-mix(in srgb, var(--nav-ink, hsl(var(--foreground))) 82%, transparent);
+  }
+
+  .nav-ink-soft-2 {
+    color: color-mix(in srgb, var(--nav-ink, hsl(var(--foreground))) 72%, transparent);
+  }
+
+  /*
+   * Card-mode copy. No text shadow anywhere: a glyph halo renders as a dark rim
+   * around each letter, which is exactly the "black layer" the card text must
+   * not have. Contrast comes from the ink colour and the frosted pane instead.
+   */
+  .nav-ink-card-pane {
+    color: var(--nav-ink, hsl(var(--foreground)));
+  }
+
+  .nav-ink-card-pane-soft {
+    color: color-mix(in srgb, var(--nav-ink, hsl(var(--foreground))) 82%, transparent);
+  }
+
+  :root:not(.dark) .nav-ink-card-pane {
+    color: hsl(var(--foreground) / 0.9);
+  }
+
+  :root:not(.dark) .nav-ink-card-pane-soft {
+    color: hsl(var(--foreground) / 0.55);
+  }
+
+  /*
+   * Controls sitting on nav-item-surface. That surface is a 7.5% white veil, so
+   * the theme foreground still shows the photo through the glyph and can match
+   * the photo's tone; --nav-ink tracks the wallpaper instead.
+   */
+  .nav-surface-ink {
+    color: color-mix(in srgb, var(--nav-ink, hsl(var(--foreground))) 78%, transparent);
+  }
+
+  .nav-surface-ink:hover {
+    color: var(--nav-ink, hsl(var(--foreground)));
+  }
+
+  /* The light-theme surface is a 50% white veil, so its composite stays light
+     even over a dark photo and the theme foreground is the safer choice. */
+  :root:not(.dark) .nav-surface-ink {
+    color: hsl(var(--foreground) / 0.7);
+  }
+
+  :root:not(.dark) .nav-surface-ink:hover {
+    color: hsl(var(--foreground) / 0.92);
+  }
+
+  /* Nav copy never uses a glyph halo: a text-shadow draws a dark rim around each
+     letter, which reads as a black slab on the cards. */
+  .text-shadow-nav {
+    text-shadow: none;
+  }
+
+  /*
+   * Bing daily photos: the copy sits on a busy image, so the muted tones are
+   * pulled up toward the full ink to keep them readable without a halo.
+   */
+  html.wallpaper-bing .nav-ink-soft {
+    color: color-mix(in srgb, var(--nav-ink, hsl(var(--foreground))) 82%, transparent);
+  }
+
+  html.wallpaper-bing .nav-ink-soft-2,
+  html.wallpaper-bing .nav-ink-on-wallpaper-soft,
+  html.wallpaper-bing .nav-ink-card-pane-soft {
+    color: color-mix(in srgb, var(--nav-ink, hsl(var(--foreground))) 88%, transparent);
   }
 
   .nav-card-glow::after {

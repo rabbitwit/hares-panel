@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { PanelHeader, SettingsSection, SwitchRow } from './settings-ui'
+import { useAppStore } from '@/store/app-store'
 import { useCloudStore } from '@/store/cloud-store'
 import {
   cloudAssetLabel,
@@ -73,6 +74,12 @@ export function SyncSettingsPanel() {
   const info = useCloudStore((state) => state.info)
   const syncMeta = useCloudStore((state) => state.syncMeta)
   const loadSyncMeta = useCloudStore((state) => state.loadSyncMeta)
+  const config = useAppStore((state) => state.config)
+  const updateConfig = useAppStore((state) => state.updateConfig)
+  const remoteUrl = config.syncRemoteUrl
+  const password = config.syncPassword
+  const mode = config.syncMode
+  const includeAssets = config.syncIncludeAssets
 
   // Cloud deployments act as read-only sync targets; only self-hosted (Docker /
   // LAN) instances initiate sync and show the full address/password form.
@@ -80,10 +87,10 @@ export function SyncSettingsPanel() {
     info?.runtime && ['cloudflare-workers', 'vercel', 'edgeone'].includes(info.runtime),
   )
 
-  const [remoteUrl, setRemoteUrl] = useState('')
-  const [password, setPassword] = useState('')
-  const [mode, setMode] = useState<CloudSyncMode>('auto')
-  const [includeAssets, setIncludeAssets] = useState(true)
+  const setRemoteUrl = (value: string) => updateConfig({ syncRemoteUrl: value })
+  const setPassword = (value: string) => updateConfig({ syncPassword: value })
+  const setMode = (value: CloudSyncMode) => updateConfig({ syncMode: value })
+  const setIncludeAssets = (value: boolean) => updateConfig({ syncIncludeAssets: value })
   const [syncing, setSyncing] = useState(false)
   const [testing, setTesting] = useState(false)
   const [result, setResult] = useState<CloudSyncResult | null>(null)

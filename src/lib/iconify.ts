@@ -76,6 +76,26 @@ export function iconNameToLabel(name: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase()) ?? name
 }
 
+/**
+ * Icon ids whose artwork is drawn entirely in `currentColor`, so recolouring
+ * them is lossless.
+ *
+ * Full-colour brand logos draw their own fills, and some of them (Netflix,
+ * Spotify, Twitch …) paint an opaque background across the whole viewBox.
+ * Flattening one of those to a single colour yields a solid block, which is
+ * why they cannot be treated as silhouettes.
+ */
+const monochromeIds = new Set<string>()
+
+for (const collection of subset as unknown as IconifyJSON[]) {
+  for (const [name, definition] of Object.entries(collection.icons)) {
+    const body = typeof definition === 'string' ? definition : definition.body
+    // `url(#…)` points at a gradient in <defs>, which is still self-coloured.
+    const hasOwnColour = /(?:fill|stroke|stop-color)="(?!none|currentColor|url\()/.test(body)
+    if (!hasOwnColour) monochromeIds.add(`${collection.prefix}:${name}`)
+  }
+}
+
 export function bundledIcons(): PickerIcon[] {
   const result: PickerIcon[] = []
   for (const collection of subset as unknown as IconifyJSON[]) {
@@ -140,4 +160,8 @@ export async function searchRemoteIcons(query: string, limit = 120): Promise<Pic
 
 export function collectionLabel(name: string) {
   return collectionLabels[name] ?? name
+}
+
+export function isMonochromeIcon(value: string) {
+  return monochromeIds.has(iconifyId(value))
 }

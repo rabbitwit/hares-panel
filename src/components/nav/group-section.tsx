@@ -89,11 +89,11 @@ function AddItemTile({ style, onClick }: { style: CardStyle; onClick: () => void
         type="button"
         onClick={onClick}
         className={cn(
-          'group flex h-[78px] w-full items-center justify-center gap-2 rounded-[var(--card-radius,16px)] border border-dashed border-foreground/15 text-[12px] font-medium text-foreground/35 transition-colors hover:border-foreground/30 hover:bg-foreground/5 hover:text-foreground/70',
-          style === 'transparent' && 'h-[64px] border-transparent hover:border-foreground/15',
+          'nav-add-tile nav-add-tile-fill group flex w-full items-center justify-center gap-2 rounded-[var(--card-radius,16px)] text-[12px] font-medium',
+          style === 'transparent' ? 'h-[64px]' : 'h-[78px]',
         )}
       >
-        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-foreground/10 bg-foreground/5 transition-transform group-hover:scale-105">
+        <span className="nav-add-tile-mark flex h-7 w-7 items-center justify-center rounded-full transition-transform group-hover:scale-105">
           <Plus className="h-3.5 w-3.5" />
         </span>
         添加卡片
@@ -105,9 +105,9 @@ function AddItemTile({ style, onClick }: { style: CardStyle; onClick: () => void
     <button
       type="button"
       onClick={onClick}
-      className="group flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-xl py-0.5 text-[12px] font-medium text-foreground/35 transition-colors hover:text-foreground/70"
+      className="nav-add-tile group flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-[var(--card-radius,16px)] py-0.5 text-[12px] font-medium"
     >
-      <span className="flex h-16 w-16 items-center justify-center rounded-[20px] border border-dashed border-foreground/20 bg-foreground/3 transition-all group-hover:border-foreground/35 group-hover:bg-foreground/7">
+      <span className="nav-add-tile-mark flex h-16 w-16 items-center justify-center rounded-[20px] transition-transform group-hover:scale-105">
         <Plus className="h-5 w-5" />
       </span>
       添加卡片
@@ -156,7 +156,21 @@ export function GroupSection({
 
   const gridClass =
     style === 'icon'
-      ? 'grid grid-cols-[repeat(auto-fill,minmax(82px,1fr))] gap-x-2 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(96px,1fr))] sm:gap-y-6'
+      ? // Icon rows span the full content width: the first tile's left edge sits
+        // on the content's left edge and the last tile's right edge on its right
+        // edge.
+        //
+        // `auto-fit` drops the columns that have no item, so the container's
+        // leftover width is free space rather than empty trailing tracks, and
+        // `justify-between` spends that space on the gutters. A plain
+        // `auto-fill` column list instead keeps the unused tracks, which is why
+        // the row ended early with a dead strip on the right.
+        //
+        // A track is 88px while the tile is 64px, so the tile is centred with
+        // 12px of slack per side; `-mx-3` grows the grid by exactly that slack
+        // at both ends, which puts the outermost tiles flush with the group
+        // heading instead of 12px inside it.
+        'grid grid-cols-[repeat(auto-fit,88px)] justify-between -mx-3 gap-y-4 sm:gap-y-5'
       : style === 'card'
         ? 'grid grid-cols-1 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(250px,1fr))]'
         : style === 'solid'
@@ -178,7 +192,7 @@ export function GroupSection({
         <div className="flex min-w-0 items-end gap-2.5">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-shadow-nav truncate text-[17px] font-semibold tracking-tight text-foreground sm:text-[18px]">
+              <h2 className="text-shadow-nav truncate text-[17px] font-semibold tracking-tight nav-ink sm:text-[18px]">
                 {group.name}
               </h2>
               {group.hidden && (
@@ -187,13 +201,13 @@ export function GroupSection({
                 </span>
               )}
               {editMode && (
-                <span className="rounded-full bg-foreground/8 px-1.5 py-0.5 text-[9px] text-foreground/40">
+                <span className="nav-ink-soft rounded-full bg-foreground/8 px-1.5 py-0.5 text-[9px]">
                   {items.length} 张
                 </span>
               )}
             </div>
             {group.description && (
-              <p className="text-shadow-nav mt-0.5 hidden truncate text-[11px] font-normal text-foreground/35 sm:block">
+              <p className="text-shadow-nav mt-0.5 hidden truncate text-[11px] font-normal nav-ink-soft sm:block">
                 {group.description}
               </p>
             )}
@@ -212,7 +226,7 @@ export function GroupSection({
                 : `收起分组 ${group.name}`
             }
             title={collapsed ? '展开分组' : '收起分组'}
-            className="flex h-7 shrink-0 items-center gap-1 rounded-full border border-foreground/8 bg-foreground/4 px-2.5 text-[10px] font-medium text-foreground/35 transition-colors hover:border-foreground/15 hover:bg-foreground/8 hover:text-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/25"
+            className="nav-item-surface nav-surface-ink flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 text-[10px] font-medium shadow-nav transition-colors hover:bg-foreground/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
           >
             <span className="hidden sm:inline">{collapsed ? '展开' : '收起'}</span>
             <ChevronDown
@@ -230,7 +244,7 @@ export function GroupSection({
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => openAddItem(group.id)}
-                className="text-foreground/45 hover:bg-foreground/10 hover:text-foreground/90"
+                className="nav-item-surface nav-surface-ink shadow-nav hover:bg-foreground/12"
                 aria-label={`向 ${group.name} 添加卡片`}
               >
                 <Plus className="h-4 w-4" />
@@ -241,7 +255,7 @@ export function GroupSection({
                     type="button"
                     variant="ghost"
                     size="icon-sm"
-                    className="text-foreground/45 hover:bg-foreground/10 hover:text-foreground/90"
+                    className="nav-item-surface nav-surface-ink shadow-nav hover:bg-foreground/12"
                     aria-label="分组操作"
                   >
                     <MoreHorizontal className="h-4 w-4" />

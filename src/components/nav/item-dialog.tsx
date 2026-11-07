@@ -28,6 +28,7 @@ import { Switch } from '@/components/ui/switch'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { NavIcon } from '@/components/nav/nav-icon'
 import { IconPicker } from '@/components/nav/icon-picker'
+import { ColorField } from '@/components/nav/color-field'
 import { useAppStore } from '@/store/app-store'
 import { useUiStore } from '@/store/ui-store'
 import { findFavicon } from '@/lib/favicon'
@@ -245,6 +246,16 @@ export function ItemDialog() {
                     />
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-border/70 bg-muted/20 p-4">
+                <div>
+                  <div className="text-sm font-medium">卡片主色</div>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    留空时按图标或网址自动匹配品牌色。纯色卡片会用它作为底色，也可以用取色笔直接从图标上取。
+                  </p>
+                </div>
+                <ColorField value={iconColor} onChange={setIconColor} />
               </div>
 
               <div className="space-y-4 rounded-xl border border-border/70 bg-muted/20 p-4">

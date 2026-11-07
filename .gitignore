@@ -30,3 +30,5 @@ skills-lock.json
 !.env.example
 .compose.deploy.yml
 docs/docker-release.local.md
+.monkeycode
+.monkeycode/*

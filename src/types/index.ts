@@ -105,6 +105,14 @@ export interface SiteConfig {
   customCss: string
   customJs: string
   defaultOpenMode: OpenMode
+  /** Remote instance URL remembered for cross-instance sync (initiator side). */
+  syncRemoteUrl: string
+  /** Remote instance admin password remembered for cross-instance sync. */
+  syncPassword: string
+  /** Remembered sync direction (initiator side). */
+  syncMode: 'auto' | 'upload' | 'download'
+  /** Remembered whether to include gallery assets when syncing. */
+  syncIncludeAssets: boolean
 }
 
 export interface AppData {

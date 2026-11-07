@@ -43,6 +43,12 @@ function useSiteEffects() {
     themeColor?.setAttribute('content', config.appearance === 'dark' ? '#070a1f' : '#eef2ff')
   }, [config.appearance])
 
+  // Exposes the 毛玻璃 setting to CSS so floating menus can share the look
+  // without every component reading the store.
+  useEffect(() => {
+    document.documentElement.classList.toggle('nav-glass', config.glassEffect)
+  }, [config.glassEffect])
+
   useEffect(() => {
     document.title = config.siteTitle.trim() || config.siteName
   }, [config.siteName, config.siteTitle])

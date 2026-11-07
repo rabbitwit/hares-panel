@@ -258,12 +258,28 @@ function absoluteUrl(value: string, base: string): string {
   }
 }
 
+const SYNC_CONFIG_KEYS = ['syncRemoteUrl', 'syncPassword', 'syncMode', 'syncIncludeAssets'] as const
+
+/**
+ * Sync settings (remote URL / password / direction) are per-instance and must
+ * not be compared or propagated across instances. Remove them from a copy of
+ * the data in place.
+ */
+function stripSyncConfig(data: SyncAppData): void {
+  if (isRecord(data.config)) {
+    for (const key of SYNC_CONFIG_KEYS) {
+      delete (data.config as Record<string, unknown>)[key]
+    }
+  }
+}
+
 function comparableData(data: SyncAppData): string {
   const copy = cloneData(data)
   copy.gallery = copy.gallery.map((asset) => {
     const { dataUrl: _dataUrl, remoteKey: _remoteKey, ...rest } = asset
     return rest as SyncGalleryAsset
   })
+  stripSyncConfig(copy)
   return JSON.stringify(copy)
 }
 
@@ -980,6 +996,7 @@ export async function performSync(
 
   if (direction === 'upload') {
     const target = cloneData(localState!.data)
+    stripSyncConfig(target)
     const assets = await syncAssetsForUpload(
       config,
       localState!.data,
@@ -1006,6 +1023,7 @@ export async function performSync(
   }
 
   const target = cloneData(remoteState!.data)
+  stripSyncConfig(target)
   const assets = await syncAssetsForDownload(
     config,
     localState,

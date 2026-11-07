@@ -200,7 +200,7 @@ export function NavPage() {
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-foreground/10 bg-foreground/8 text-foreground/40">
               <LayoutGrid className="h-6 w-6" />
             </span>
-            <h2 className="text-shadow-nav mt-4 text-lg font-semibold text-foreground">这里还很安静</h2>
+            <h2 className="text-shadow-nav mt-4 text-lg font-semibold nav-ink">这里还很安静</h2>
             <p className="mx-auto mt-1.5 max-w-xs text-[11px] leading-relaxed text-foreground/40">
               {isAdmin
                 ? '创建第一个分组，然后添加你每天都会打开的网站和 NAS 服务。'
@@ -263,9 +263,9 @@ export function NavPage() {
                 <button
                   type="button"
                   onClick={() => openGroupDialog(null)}
-                  className="group flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-foreground/12 py-5 text-xs font-medium text-foreground/30 transition-colors hover:border-foreground/25 hover:bg-foreground/4 hover:text-foreground/60"
+                  className="nav-add-tile nav-add-tile-fill group flex w-full items-center justify-center gap-2 rounded-2xl py-5 text-xs font-medium"
                 >
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full border border-foreground/10 bg-foreground/5 transition-transform group-hover:scale-105">
+                  <span className="nav-add-tile-mark flex h-7 w-7 items-center justify-center rounded-full transition-transform group-hover:scale-105">
                     <Plus className="h-3.5 w-3.5" />
                   </span>
                   新建分组
@@ -296,7 +296,7 @@ export function NavPage() {
         <SystemStatus />
 
         {config.footerEnabled && (
-          <footer className="mt-14 text-center text-[10px] leading-relaxed text-foreground/30 sm:mt-16">
+          <footer className="mt-14 text-center text-[10px] leading-relaxed nav-ink-soft-2 sm:mt-16">
             {config.footerHtml ? (
               <div
                 className="footer-html"

@@ -13,6 +13,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NavIcon } from '@/components/nav/nav-icon'
+import { ColorField } from '@/components/nav/color-field'
 import { useAppStore } from '@/store/app-store'
 import {
   collectionLabel,
@@ -21,7 +22,8 @@ import {
   type PickerIcon,
 } from '@/lib/iconify'
 import { filesToGalleryAssets } from '@/lib/image'
-import { cn, formatBytes } from '@/lib/utils'
+import { brandColorForIcon } from '@/lib/brand-color'
+import { cn, colorFromString, colorWithAlpha, formatBytes, readableTextColor } from '@/lib/utils'
 
 interface IconPickerProps {
   open: boolean
@@ -32,7 +34,6 @@ interface IconPickerProps {
   onSelect: (icon: string, color: string) => void
 }
 
-const colorSwatches = ['', '#ffffff', '#a78bfa', '#60a5fa', '#34d399', '#fbbf24', '#fb7185', '#f472b6']
 type TabKey = 'library' | 'gallery' | 'url'
 
 export function IconPicker({
@@ -88,6 +89,10 @@ export function IconPicker({
   }, [open, query])
 
   const iconAssets = gallery.filter((asset) => asset.category === 'icon')
+
+  // The preview mirrors a solid card, so it needs the same accent resolution
+  // the card uses: explicit colour, then the icon's own brand colour.
+  const previewAccent = draftColor || brandColorForIcon(draft) || colorFromString(title || draft || '图标')
 
   const handleUpload = async (files: FileList | null) => {
     if (!files?.length) return
@@ -365,41 +370,24 @@ export function IconPicker({
 
           <aside className="w-full shrink-0 border-t border-border/70 bg-muted/25 p-5 sm:w-[240px] sm:border-l sm:border-t-0">
             <div className="text-xs font-medium text-muted-foreground">预览</div>
-            <div className="mt-3 flex flex-col items-center gap-3 rounded-2xl border border-border/60 bg-[#101329] p-5 shadow-inner">
-              <div className="flex h-16 w-16 items-center justify-center rounded-[18px] border border-white/10 bg-white/8">
-                <NavIcon icon={draft} iconColor={draftColor} title={title || '图标'} size={34} />
+            <div
+              className="mt-3 flex flex-col items-center gap-3 rounded-2xl border border-white/20 p-5 shadow-inner"
+              style={{ background: `linear-gradient(135deg, ${colorWithAlpha(previewAccent, 0.96)}, ${colorWithAlpha(previewAccent, 0.76)})`, color: readableTextColor(previewAccent) }}
+            >
+              <div className="flex h-16 w-16 items-center justify-center rounded-[18px] border border-white/25 bg-white/15">
+                <NavIcon icon={draft} iconColor={draftColor} title={title || '图标'} size={34} silhouette />
               </div>
-              <div className="max-w-full truncate text-xs text-white/70">{title || '卡片标题'}</div>
+              <div className="max-w-full truncate text-xs opacity-95">{title || '卡片标题'}</div>
             </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
+              按纯色卡片样式预览，实际效果随卡片样式变化。
+            </p>
 
             <div className="mt-5 space-y-2">
               <Label className="text-xs">图标颜色</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {colorSwatches.map((swatch) => (
-                  <button
-                    key={swatch || 'auto'}
-                    type="button"
-                    onClick={() => setDraftColor(swatch)}
-                    className={cn(
-                      'flex h-6 w-6 items-center justify-center rounded-full border border-border/80 text-[9px] text-muted-foreground transition-transform hover:scale-110',
-                      !swatch && 'bg-[linear-gradient(135deg,#fff_50%,#333_50%)]',
-                      draftColor === swatch && 'ring-2 ring-primary ring-offset-1 ring-offset-background',
-                    )}
-                    style={swatch ? { backgroundColor: swatch } : undefined}
-                    title={swatch || '跟随图标默认颜色'}
-                  >
-                    {!swatch && 'A'}
-                  </button>
-                ))}
-              </div>
-              <Input
-                value={draftColor}
-                onChange={(event) => setDraftColor(event.target.value)}
-                placeholder="#ffffff（留空自动）"
-                className="h-8 text-xs"
-              />
+              <ColorField value={draftColor} onChange={setDraftColor} />
               <p className="text-[10px] leading-relaxed text-muted-foreground">
-                仅对单色图标生效。品牌彩色 Logo 会自动保留原色。
+                仅对单色图标生效。品牌彩色 Logo 会自动保留原色；纯色卡片模式下这个颜色就是卡片底色。
               </p>
             </div>
 

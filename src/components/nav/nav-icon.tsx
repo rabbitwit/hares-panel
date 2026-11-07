@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Icon } from '@iconify/react'
 import { useAppStore } from '@/store/app-store'
 import { rewriteLegacyGoogleFavicon } from '@/lib/favicon'
-import { iconifyId, isEmoji, isIconifyName, isImageSource } from '@/lib/iconify'
+import { iconifyId, isEmoji, isIconifyName, isImageSource, isMonochromeIcon } from '@/lib/iconify'
 import { colorFromString, getInitials } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
@@ -15,6 +15,8 @@ interface NavIconProps {
   imageClassName?: string
   /** Corner radius (px) applied to image-based icons inside the card. */
   radius?: number
+  /** Draw the icon as a single-colour silhouette on the card's accent fill. */
+  silhouette?: boolean
 }
 
 export function NavIcon({
@@ -25,6 +27,7 @@ export function NavIcon({
   className,
   imageClassName,
   radius,
+  silhouette,
 }: NavIconProps) {
   const gallery = useAppStore((state) => state.gallery)
   const [imageFailed, setImageFailed] = useState(false)
@@ -60,12 +63,21 @@ export function NavIcon({
     }
 
     if (isIconifyName(resolvedIcon)) {
+      // On a card filled with the brand colour, a logo tinted in that same
+      // brand colour would vanish. Single-colour artwork is therefore drawn in
+      // the card's text colour, which is already picked for contrast.
+      //
+      // The icon itself is never substituted and never filtered: a full-colour
+      // logo keeps its own artwork, because flattening it (Netflix, Spotify and
+      // friends paint an opaque background) would produce a solid block, and
+      // swapping it for a lookalike would ignore what the user picked.
+      const inheritColor = silhouette && isMonochromeIcon(resolvedIcon)
       return (
         <Icon
           icon={iconifyId(resolvedIcon)}
           width={size}
           height={size}
-          style={{ color: iconColor || undefined }}
+          style={{ color: inheritColor ? undefined : iconColor || undefined }}
           className={cn('shrink-0 drop-shadow-sm', className)}
         />
       )

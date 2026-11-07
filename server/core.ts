@@ -292,6 +292,12 @@ export function publicState(
   const publicConfig = { ...(state.config as Record<string, unknown>) }
   delete publicConfig.adminName
   delete publicConfig.adminAvatar
+  // Per-instance sync settings (incl. the remote admin password) must never be
+  // exposed to public visitors.
+  delete publicConfig.syncRemoteUrl
+  delete publicConfig.syncPassword
+  delete publicConfig.syncMode
+  delete publicConfig.syncIncludeAssets
   if (options.locked) {
     // Public access is disabled: only expose the configuration needed for the
     // login screen (theme, name, logo, ...) and hide all navigation content.

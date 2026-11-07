@@ -19,7 +19,7 @@ export function NavHeader() {
             <SiteLogo
               showLogoMark={showLogoMark}
               showText={showLogo}
-              textClassName="text-shadow-nav text-[30px] text-foreground sm:text-[36px] lg:text-[42px]"
+              textClassName="text-shadow-nav text-[30px] nav-ink sm:text-[36px] lg:text-[42px]"
               markClassName="h-10 w-10 sm:h-12 sm:w-12"
             />
           </div>
@@ -31,11 +31,11 @@ export function NavHeader() {
 
         {showClock && (
           <div className="pb-0.5 text-left">
-            <div className="text-shadow-nav font-display text-[26px] font-bold leading-none tabular-nums tracking-[-0.03em] text-foreground sm:text-[32px]">
+            <div className="text-shadow-nav font-display text-[26px] font-bold leading-none tabular-nums tracking-[-0.03em] nav-ink sm:text-[32px]">
               {formatTime(now, { seconds: config.showSeconds, use24Hour: config.use24Hour })}
             </div>
             {config.showDate && (
-              <div className="text-shadow-nav mt-1.5 text-[11px] font-medium text-foreground/65 sm:text-xs">
+              <div className="text-shadow-nav mt-1.5 text-[11px] font-medium nav-ink-soft-2 sm:text-xs">
                 {formatDate(now)}
               </div>
             )}
@@ -44,7 +44,7 @@ export function NavHeader() {
       </div>
 
       {!showLogo && showClock && (
-        <div className="text-shadow-nav mt-3 text-[13px] font-medium text-foreground/50">
+        <div className="text-shadow-nav mt-3 text-[13px] font-medium nav-ink-soft">
           {config.siteName}
         </div>
       )}

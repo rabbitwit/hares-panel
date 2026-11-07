@@ -205,7 +205,7 @@ export function SystemStatus() {
         <div className="flex items-center gap-2.5">
           <h2
             id="system-status-title"
-            className="text-shadow-nav text-[17px] font-semibold tracking-tight text-foreground sm:text-lg"
+            className="text-shadow-nav text-[17px] font-semibold tracking-tight nav-ink sm:text-lg"
           >
             {config.systemStatusTitle}
           </h2>

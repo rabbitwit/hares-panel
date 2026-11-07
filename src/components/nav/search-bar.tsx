@@ -204,7 +204,7 @@ export function SearchBar() {
       </form>
 
       {showMatches && (
-        <div className="absolute left-0 right-0 top-[calc(100%+10px)] overflow-hidden rounded-2xl border border-border/70 bg-background/95 p-1.5 text-foreground shadow-2xl backdrop-blur-2xl">
+        <div className="nav-menu-surface absolute left-0 right-0 top-[calc(100%+10px)] overflow-hidden rounded-2xl p-1.5">
           <div className="px-2.5 py-1.5 text-[10px] font-medium uppercase tracking-wider text-foreground/40">
             站内快速访问
           </div>

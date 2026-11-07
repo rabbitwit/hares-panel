@@ -316,12 +316,21 @@ function absoluteUrl(value, base) {
     return value;
   }
 }
+var SYNC_CONFIG_KEYS = ["syncRemoteUrl", "syncPassword", "syncMode", "syncIncludeAssets"];
+function stripSyncConfig(data) {
+  if (isRecord2(data.config)) {
+    for (const key of SYNC_CONFIG_KEYS) {
+      delete data.config[key];
+    }
+  }
+}
 function comparableData(data) {
   const copy = cloneData(data);
   copy.gallery = copy.gallery.map((asset) => {
     const { dataUrl: _dataUrl, remoteKey: _remoteKey, ...rest } = asset;
     return rest;
   });
+  stripSyncConfig(copy);
   return JSON.stringify(copy);
 }
 async function readResponseBytes(response, maxBytes) {
@@ -899,6 +908,7 @@ async function performSync(config, input, options = {}) {
   }
   if (direction === "upload") {
     const target2 = cloneData(localState.data);
+    stripSyncConfig(target2);
     const assets2 = await syncAssetsForUpload(
       config,
       localState.data,
@@ -924,6 +934,7 @@ async function performSync(config, input, options = {}) {
     };
   }
   const target = cloneData(remoteState.data);
+  stripSyncConfig(target);
   const assets = await syncAssetsForDownload(
     config,
     localState,
@@ -1145,6 +1156,10 @@ function publicState(data, options = {}) {
   const publicConfig = { ...state.config };
   delete publicConfig.adminName;
   delete publicConfig.adminAvatar;
+  delete publicConfig.syncRemoteUrl;
+  delete publicConfig.syncPassword;
+  delete publicConfig.syncMode;
+  delete publicConfig.syncIncludeAssets;
   if (options.locked) {
     return {
       config: publicConfig,

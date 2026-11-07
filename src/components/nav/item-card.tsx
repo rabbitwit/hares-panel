@@ -30,6 +30,7 @@ import { useOpenItem } from '@/hooks/use-open-item'
 import { useAppStore } from '@/store/app-store'
 import { useUiStore } from '@/store/ui-store'
 import { resolveItemUrl } from '@/lib/network'
+import { brandColorForIcon, brandColorForUrl } from '@/lib/brand-color'
 import { cn, colorWithAlpha, colorFromString, getDomain, copyText, readableTextColor } from '@/lib/utils'
 import type { CardStyle, NavGroup, NavItem } from '@/types'
 
@@ -93,7 +94,15 @@ export function ItemCard({
     if (ok) toast.success('链接已复制')
   }
 
-  const accent = item.iconColor || colorFromString(item.title)
+  // Cards can carry an icon id (looked up by name), a scraped favicon (looked
+  // up by the site it renders), or neither -- then the title picks a stable
+  // colour so the card still has an identity.
+  const accent =
+    item.iconColor ||
+    brandColorForIcon(item.icon) ||
+    brandColorForUrl(item.icon) ||
+    brandColorForUrl(effectiveUrl || item.url || item.lanUrl) ||
+    colorFromString(item.title)
   const tintSoft = colorWithAlpha(accent, 0.1)
   const solidForeground = readableTextColor(accent)
   const isHorizontal = style === 'card' || style === 'transparent' || style === 'solid'
@@ -114,7 +123,8 @@ export function ItemCard({
       className={cn(
         'relative flex shrink-0 items-center justify-center transition-all duration-300',
         style === 'icon' && 'nav-icon-tile h-16 w-16 rounded-[var(--icon-radius,20px)] group-hover/card:scale-105 group-hover/card:shadow-glow',
-        style === 'solid' && 'h-10 w-10 rounded-xl border border-white/25 bg-white/15 group-hover/card:bg-white/20',
+        style === 'solid' &&
+          'h-10 w-10 rounded-xl border border-white/25 bg-white/15 group-hover/card:bg-white/20',
         style === 'card' && 'h-11 w-11 rounded-[13px] border border-foreground/10 bg-foreground/8',
         style === 'transparent' && 'h-9 w-9 rounded-xl',
         glassEffect && style === 'icon' && 'nav-glass-tile is-glass',
@@ -127,6 +137,7 @@ export function ItemCard({
         title={item.title}
         size={iconSize}
         radius={iconRadiusEnabled ? iconRadius : 0}
+        silhouette={style === 'solid'}
       />
       {item.badge && style !== 'solid' && (
         <span className="absolute -right-1.5 -top-1.5 rounded-full border border-foreground/20 bg-gradient-to-r from-violet-500 to-fuchsia-500 px-1.5 py-0.5 text-[8px] font-semibold leading-none text-white shadow-lg">
@@ -149,10 +160,10 @@ export function ItemCard({
       <span
         className={cn(
           'block truncate font-medium',
-          style === 'solid' ? 'text-[13.5px] text-current' : 'text-foreground/90',
-          style === 'icon' && 'text-[12.5px]',
-          style === 'card' && 'text-[14px]',
-          style === 'transparent' && 'text-[13px]',
+          style === 'solid' && 'text-[13.5px] text-current',
+          style === 'icon' && 'nav-ink-on-wallpaper text-[12.5px]',
+          style === 'transparent' && 'nav-ink-on-wallpaper text-[13px]',
+          style === 'card' && 'nav-ink-card-pane text-[14px]',
         )}
       >
         {item.title}
@@ -161,7 +172,9 @@ export function ItemCard({
         <span
           className={cn(
             'mt-0.5 block truncate text-[11px] font-normal',
-            style === 'solid' ? 'text-current opacity-70' : 'text-foreground/42',
+            style === 'solid' && 'text-current opacity-70',
+            style === 'transparent' && 'nav-ink-on-wallpaper-soft',
+            style === 'card' && 'nav-ink-card-pane-soft',
           )}
         >
           {item.description}
@@ -277,8 +290,8 @@ export function ItemCard({
       <ContextMenuTrigger asChild>{cardBody}</ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuLabel className="flex items-center justify-between gap-4">
-          <span className="truncate">{item.title}</span>
-          <span className="font-normal text-foreground/30">{getDomain(effectiveUrl)}</span>
+          <span className="truncate text-foreground">{item.title}</span>
+          <span className="truncate font-normal text-muted-foreground">{getDomain(effectiveUrl)}</span>
         </ContextMenuLabel>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => openItem(item)}>
