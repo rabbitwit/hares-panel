@@ -8,7 +8,7 @@
  * with the same code.
  */
 
-import type { ApiConfig, SyncMeta } from './core'
+import type { ApiConfig, SyncMeta } from './core.js'
 
 export type SyncMode = 'auto' | 'upload' | 'download'
 export type SyncDirection = 'upload' | 'download' | 'none'

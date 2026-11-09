@@ -117,6 +117,17 @@ const origin = `http://127.0.0.1:${apiPort}`
 
 console.log('\nVercel function (mock Upstash)')
 
+await test('Vercel server modules use ESM .js import specifiers', async () => {
+  const files = ['server/core.ts', 'server/vercel.ts', 'server/vercel-node.ts', 'server/sync.ts']
+  for (const rel of files) {
+    const source = fs.readFileSync(path.join(root, rel), 'utf8')
+    const missing = [...source.matchAll(/from ['"](\.[^'"]+)['"]/g)]
+      .map((match) => match[1])
+      .filter((spec) => !spec.endsWith('.js'))
+    assert.deepEqual(missing, [], `${rel} missing .js extensions: ${missing.join(', ')}`)
+  }
+})
+
 await test('health reports Redis storage without assets', async () => {
   const response = await fetch(`${origin}/api/health`)
   const body = await response.json()

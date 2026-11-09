@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import type { ApiConfig, AssetStore, StateStore, SyncMeta } from './core'
+import type { ApiConfig, AssetStore, StateStore, SyncMeta } from './core.js'
 
 export interface VercelEnv {
   ADMIN_PASSWORD?: string

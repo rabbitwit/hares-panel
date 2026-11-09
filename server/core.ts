@@ -9,8 +9,8 @@ import {
   getLatestRelease,
   normalizeVersion,
   type LatestRelease,
-} from './update'
-import { performSync, SyncError } from './sync'
+} from './update.js'
+import { performSync, SyncError } from './sync.js'
 
 export interface StoredState {
   data: unknown

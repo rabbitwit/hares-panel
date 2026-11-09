@@ -44,6 +44,7 @@
 - 备份导入 schema 补充同步相关配置字段。
 - 重写 Vercel 网页控制台部署步骤：按「导入 Git → 连接 Blob / Upstash Redis → Redeploy」的真实顺序说明，并补充 Gitee 无法导入、不要改成 Next.js、环境变量必须勾选 Production 等易错点。
 - Vercel 网页部署：不再把全部路径重写到 `index.html`（会吞掉 `/api`）；增加独立的 `api/health.ts` 入口，并放宽 `/api/health` 探测超时，避免 Hobby 冷启动被误判成「无法连接服务端」。
+- 修复 Vercel Function 因 ESM 相对导入缺少 `.js` 后缀而 500（`Cannot find module '/var/task/server/update'`）。
 
 ### 修复
 
