@@ -4,7 +4,7 @@
   "main": "worker/index.ts",
   "compatibility_date": "2025-10-01",
   "observability": {
-    "enabled": true
+    "enabled": false
   },
   "assets": {
     "directory": "./dist",

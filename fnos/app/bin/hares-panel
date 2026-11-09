@@ -1,0 +1,77 @@
+#!/bin/bash
+# Foreground launcher for the native fnOS build. cmd/main daemonizes this
+# script; `exec` keeps the Node process on the same PID so stop/status work.
+set -eu
+
+APP_DIR="${TRIM_APPDEST:-${TRIM_APP:-}}"
+if [ -z "$APP_DIR" ]; then
+  APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+fi
+if [ ! -f "$APP_DIR/server/index.mjs" ] && [ -f "$APP_DIR/app/server/index.mjs" ]; then
+  APP_DIR="$APP_DIR/app"
+fi
+
+DATA_DIR="${HARES_DATA_DIR:-${TRIM_PKGVAR:-}/data}"
+if [ -z "${TRIM_PKGVAR:-}" ] && [ -z "${HARES_DATA_DIR:-}" ]; then
+  echo "[hares-panel] TRIM_PKGVAR / HARES_DATA_DIR is not set" >&2
+  exit 1
+fi
+
+PORT="${APP_PORT:-${PORT:-${TRIM_SERVICE_PORT:-18000}}}"
+NODE="${APP_DIR}/runtime/node"
+SERVER="${APP_DIR}/server/index.mjs"
+WEB="${APP_DIR}/web"
+
+if [ ! -x "$NODE" ] && [ ! -f "$NODE" ]; then
+  echo "[hares-panel] bundled Node runtime is missing: $NODE" >&2
+  exit 1
+fi
+if [ ! -f "$SERVER" ]; then
+  echo "[hares-panel] server bundle is missing: $SERVER" >&2
+  exit 1
+fi
+if [ ! -d "$WEB" ]; then
+  echo "[hares-panel] static files are missing: $WEB" >&2
+  exit 1
+fi
+
+chmod +x "$NODE" 2>/dev/null || true
+mkdir -p "$DATA_DIR/assets"
+
+generate_password() {
+  while :; do
+    candidate="$(head -c 24 /dev/urandom | base64 | tr -d '\n=' | tr '+/' '-_')"
+    case "$candidate" in
+      [A-Za-z0-9]*[A-Za-z0-9]) printf '%s\n' "$candidate"; return 0 ;;
+    esac
+  done
+}
+
+if [ -z "${ADMIN_PASSWORD:-}" ]; then
+  if [ -s "$DATA_DIR/admin-password" ]; then
+    ADMIN_PASSWORD="$(cat "$DATA_DIR/admin-password")"
+    echo "[hares-panel] 使用已保存的管理员密码：$DATA_DIR/admin-password"
+  else
+    ADMIN_PASSWORD="$(generate_password)"
+    printf '%s\n' "$ADMIN_PASSWORD" > "$DATA_DIR/admin-password"
+    chmod 600 "$DATA_DIR/admin-password" 2>/dev/null || true
+    echo "============================================================"
+    echo " Hares-Panel 首次启动，已自动生成管理员密码（复制下面这一行，不要带空格）："
+    echo "$ADMIN_PASSWORD"
+    echo " 密码同时保存在 $DATA_DIR/admin-password"
+    echo "============================================================"
+  fi
+fi
+
+export NODE_ENV=production
+export HARES_RUNTIME="${HARES_RUNTIME:-fnos}"
+export HARES_DATA_DIR="$DATA_DIR"
+export HARES_STATIC_DIR="$WEB"
+export APP_PORT="$PORT"
+export PORT="$PORT"
+export HOST="${HOST:-0.0.0.0}"
+export TZ="${TZ:-Asia/Shanghai}"
+export ADMIN_PASSWORD
+
+echo "[hares-panel] 启动 Node HTTP 服务（端口 $PORT）"
+exec "$NODE" "$SERVER"

@@ -397,7 +397,7 @@ export function AppearanceSettingsPanel() {
           <div className="space-y-2">
             <SwitchRow
               label="图标圆角"
-              hint="为图标模式卡片启用圆角；关闭后图标保持直角。"
+              hint="仅作用于图标本身，不影响卡片外边框；关闭后图标保持直角。"
               checked={config.iconRadiusEnabled}
               onCheckedChange={(value) => updateConfig({ iconRadiusEnabled: value })}
             />

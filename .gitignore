@@ -32,3 +32,10 @@ skills-lock.json
 docs/docker-release.local.md
 .monkeycode
 .monkeycode/*
+.ohmyagent
+.ohmyagent/*
+fnos/.cache/
+fnos/app/runtime/
+fnos/app/server/
+fnos/app/web/
+fnos/hares-panel.fpk

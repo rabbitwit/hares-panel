@@ -1,7 +1,8 @@
 #!/bin/bash
-# Build the fnOS package (hares-panel.fpk).
+# Build the native fnOS package (hares-panel.fpk).
 #
-# Requires fnpack from https://developer.fnnas.com/docs/cli/fnpack/
+# Bundles the Linux Node runtime + SPA + server, then calls fnpack.
+# Requires Node.js 24 and fnpack from https://developer.fnnas.com/docs/cli/fnpack/
 #   FNPACK=/path/to/fnpack ./build.sh
 set -eu
 cd "$(dirname "$0")"
@@ -9,6 +10,6 @@ cd "$(dirname "$0")"
 FNPACK="${FNPACK:-fnpack}"
 mkdir -p wizard
 
-node ../scripts/sync-fnos-version.mjs
+node ../scripts/prepare-fnos.mjs
 "$FNPACK" build
 echo "built: $(pwd)/hares-panel.fpk"

@@ -1,28 +1,175 @@
 #!/bin/bash
-# Status probe for the Hares-Panel container started by appcenter.
+# Native service control for Hares-Panel on fnOS. No Docker.
+# Official install dir is TRIM_APPDEST (not TRIM_APP). See:
+# https://developer.fnnas.com/docs/core-concepts/environment-variables/
 
-CONTAINER_NAME="hares-panel"
+resolve_app_dir() {
+  local candidate
+  for candidate in "${TRIM_APPDEST:-}" "${TRIM_APP:-}"; do
+    if [ -n "$candidate" ]; then
+      if [ -f "$candidate/bin/hares-panel" ]; then
+        printf '%s\n' "$candidate"
+        return 0
+      fi
+      if [ -f "$candidate/app/bin/hares-panel" ]; then
+        printf '%s\n' "$candidate/app"
+        return 0
+      fi
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
 
-is_running() {
-    docker inspect "$CONTAINER_NAME" 2>/dev/null | grep -q '"Status": "running"'
+  local script_dir
+  script_dir="$(cd "$(dirname "$0")" && pwd)"
+  for candidate in "$script_dir/../target" "$script_dir/../app"; do
+    if [ -f "$candidate/bin/hares-panel" ]; then
+      (cd "$candidate" && pwd)
+      return 0
+    fi
+  done
+  printf '\n'
+  return 1
 }
 
-case "$1" in
-start)
-    # appcenter starts the docker project itself
-    exit 0
-    ;;
-stop)
-    # appcenter stops the docker project itself
-    exit 0
-    ;;
-status)
-    if is_running; then
-        exit 0
+APP_DIR="$(resolve_app_dir || true)"
+VAR_DIR="${TRIM_PKGVAR:-}"
+if [ -z "$VAR_DIR" ] && [ -n "$APP_DIR" ]; then
+  VAR_DIR="$(cd "$APP_DIR/.." && pwd)/var"
+fi
+SERVICE_PORT="${TRIM_SERVICE_PORT:-18000}"
+PID_FILE=""
+LOG_FILE=""
+if [ -n "$VAR_DIR" ]; then
+  PID_FILE="${VAR_DIR}/hares-panel.pid"
+  LOG_FILE="${VAR_DIR}/hares-panel.log"
+fi
+RUNNER="${APP_DIR}/bin/hares-panel"
+
+fail() {
+  local msg="$1"
+  echo "$msg" >&2
+  if [ -n "${TRIM_TEMP_LOGFILE:-}" ]; then
+    {
+      printf '%s\n' "$msg"
+      if [ -n "$LOG_FILE" ] && [ -s "$LOG_FILE" ]; then
+        echo "---- $LOG_FILE ----"
+        tail -n 80 "$LOG_FILE" 2>/dev/null || true
+      fi
+    } > "$TRIM_TEMP_LOGFILE" 2>/dev/null || true
+  fi
+  exit 1
+}
+
+is_running() {
+  if [ -z "$PID_FILE" ] || [ ! -f "$PID_FILE" ]; then
+    return 1
+  fi
+  pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$PID_FILE"
+  return 1
+}
+
+stop_process() {
+  if [ -z "$VAR_DIR" ] || ! is_running; then
+    rm -f "$PID_FILE"
+    return 0
+  fi
+  pid="$(cat "$PID_FILE")"
+  kill "$pid" 2>/dev/null || true
+  i=0
+  while [ "$i" -lt 20 ]; do
+    if ! kill -0 "$pid" 2>/dev/null; then
+      break
     fi
-    exit 3
-    ;;
+    sleep 1
+    i=$((i + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -9 "$pid" 2>/dev/null || true
+  fi
+  rm -f "$PID_FILE"
+}
+
+is_listening() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -lnt 2>/dev/null | grep -Eq ":${port}([[:space:]]|$)"
+    return $?
+  fi
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -lnt 2>/dev/null | grep -Eq ":${port}([[:space:]]|$)"
+    return $?
+  fi
+  (echo >/dev/tcp/127.0.0.1/"$port") >/dev/null 2>&1
+}
+
+wait_for_ready() {
+  local i=0
+  while [ "$i" -lt 30 ]; do
+    if ! is_running; then
+      return 1
+    fi
+    if is_listening "$SERVICE_PORT"; then
+      return 0
+    fi
+    sleep 1
+    i=$((i + 1))
+  done
+  return 1
+}
+
+case "${1:-}" in
+start)
+  if [ -z "$APP_DIR" ] || [ -z "$VAR_DIR" ]; then
+    fail "TRIM_APPDEST / TRIM_PKGVAR is not set"
+  fi
+  if is_running && is_listening "$SERVICE_PORT"; then
+    exit 0
+  fi
+  if is_running; then
+    if wait_for_ready; then
+      exit 0
+    fi
+    stop_process
+    fail "hares-panel is running but port ${SERVICE_PORT} is not listening; see $LOG_FILE"
+  fi
+  mkdir -p "$VAR_DIR"
+  chmod +x "$APP_DIR/runtime/node" "$RUNNER" 2>/dev/null || true
+  if [ ! -f "$RUNNER" ]; then
+    fail "launcher is missing: $RUNNER"
+  fi
+  if [ ! -f "$APP_DIR/runtime/node" ]; then
+    fail "bundled Node runtime is missing: $APP_DIR/runtime/node"
+  fi
+  if [ ! -f "$APP_DIR/server/index.mjs" ]; then
+    fail "server bundle is missing: $APP_DIR/server/index.mjs"
+  fi
+  export TRIM_APPDEST="$APP_DIR"
+  export TRIM_PKGVAR="$VAR_DIR"
+  export TRIM_SERVICE_PORT="$SERVICE_PORT"
+  nohup bash "$RUNNER" >> "$LOG_FILE" 2>&1 &
+  echo $! > "$PID_FILE"
+  if wait_for_ready; then
+    exit 0
+  fi
+  stop_process
+  fail "failed to start hares-panel on port ${SERVICE_PORT}; see $LOG_FILE"
+  ;;
+stop)
+  stop_process
+  exit 0
+  ;;
+status)
+  if is_running; then
+    exit 0
+  fi
+  exit 3
+  ;;
 *)
-    exit 1
-    ;;
+  fail "Unknown command: ${1:-}"
+  ;;
 esac

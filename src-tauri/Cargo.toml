@@ -1,9 +1,10 @@
 [package]
-name = "hares-nav"
+name = "hares-panel"
 # App/bundle version is read from ../package.json via tauri.conf.json.
 version = "0.1.0"
 description = "Hares-Panel — 本地优先的导航首页"
 authors = ["Hares-Panel"]
+license = "PolyForm-Noncommercial-1.0.0"
 edition = "2021"
 rust-version = "1.77.2"
 

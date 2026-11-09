@@ -342,4 +342,4 @@ docker push <DOCKERHUB_USERNAME>/hares-panel:latest
 
 ## 许可
 
-MIT License。详情请查看项目仓库中的 `LICENSE` 文件。
+PolyForm Noncommercial License 1.0.0。允许个人与非营利使用，禁止商业用途。详情请查看项目仓库中的 `LICENSE` 文件。

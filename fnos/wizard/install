@@ -4,7 +4,7 @@
     "items": [
       {
         "type": "tips",
-        "helpText": "设置用于登录 Hares-Panel 管理界面的管理员密码。若留空，首次启动时会自动生成随机密码（查看容器日志或数据目录里的 admin-password）。"
+        "helpText": "设置用于登录 Hares-Panel 管理界面的管理员密码。若留空，首次启动时会自动生成随机密码（查看应用日志或数据目录里的 admin-password）。"
       },
       {
         "type": "password",

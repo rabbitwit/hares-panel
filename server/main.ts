@@ -267,7 +267,7 @@ export async function startServer(env: NodeJS.ProcessEnv = process.env): Promise
   console.log(`[hares-panel] data: ${runtime.dataDir} (${runtime.stateFile})`)
   if (!runtime.config.adminPassword) {
     console.warn(
-      '[hares-panel] ADMIN_PASSWORD 未设置，登录接口会返回 503。Docker 入口脚本会自动生成密码。',
+      '[hares-panel] ADMIN_PASSWORD 未设置，登录接口会返回 503。自托管启动脚本会自动生成密码。',
     )
   }
 

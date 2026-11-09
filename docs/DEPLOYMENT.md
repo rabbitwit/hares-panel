@@ -2,14 +2,15 @@
 
 > 返回 [README](../README.md) · 版本记录见 [CHANGELOG](../CHANGELOG.md)
 
-Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API 必须部署在同一个域下，**不能只托管 `dist/` 静态目录**。生产环境请选择下面四种方式之一：
+Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API 必须部署在同一个域下，**不能只托管 `dist/` 静态目录**。生产环境请选择下面方式之一：
 
 | 平台 | 导航数据 | 图片 / 图标 | 适合场景 |
 | --- | --- | --- | --- |
 | **Cloudflare Workers** | D1（推荐）或 KV | R2 | 已有 Cloudflare 账号，想要低延迟和免费额度 |
 | **Vercel** | Upstash Redis | Vercel Blob | 已在用 Vercel，希望从 Git 仓库自动部署 |
 | **EdgeOne Makers（国际版）** | EdgeOne Blob | EdgeOne Blob | 使用腾讯国际站，希望 Node Functions + Blob 一体化 |
-| **Docker 自托管** | 本地 `./data/state.json` | 本地 `./data/assets/` | 有 NAS / 云主机，想一条命令部署；公网可配合现有反代 |
+| **Docker 自托管** | 本地 `./data/state.json` | 本地 `./data/assets/` | 有 NAS / 云主机，想一条命令部署 |
+| **飞牛 fnOS 原生应用** | 应用数据目录 `state.json` | 应用数据目录 `assets/` | 飞牛 NAS，安装 `.fpk`，不依赖 Docker |
 
 > 各平台的数据完全独立，不会自动同步。需要保持多端一致时，请阅读文末的「实例同步」。
 
@@ -25,6 +26,7 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 - [Vercel](#vercelupstash-redis--vercel-blob)
 - [EdgeOne Makers](#edgeone-makers腾讯国际版)
 - [Docker 自托管](#docker-自托管)
+- [飞牛 fnOS 原生应用包](#方式-e飞牛-fnos-原生应用包fpk)
 - [部署后检查清单](#部署后检查清单)
 - [数据迁移与备份](#数据迁移与备份)
 - [实例同步](#实例同步)
@@ -706,20 +708,22 @@ docker run -d --name hares-panel --restart unless-stopped \
 - 如果界面用的是「选择镜像 → 创建容器」而不是 Compose：新镜像已经 `EXPOSE 18000` 且容器内监听 18000，界面同样会预填 `18000 → 18000`，直接创建即可（旧镜像 `EXPOSE 3000`，需要重新构建镜像）。
 - 平台支持 Compose 时优先用上面的「方式 B」：`docker-compose.yml` 已经包含 `18000:18000`、`/data` 挂载、重启策略和日志轮转，不用逐项手填。
 
-### 方式 E：飞牛 fnOS 应用包（.fpk）
+### 方式 E：飞牛 fnOS 原生应用包（.fpk）
 
-仓库里附带了飞牛应用中心的安装包 [hares-panel.fpk](../fnos/hares-panel.fpk)（源码与打包脚本在 [fnos/](../fnos/README.md)）。在「应用中心 → 手动安装」里选中它安装，完成后从桌面图标打开：
+仓库 [fnos/](../fnos/README.md) 提供飞牛应用中心的**原生应用包**（不是 Docker 套壳）。安装后由应用中心直接启动捆绑的 Node 进程，不拉取镜像、不创建容器。在「应用中心 → 手动安装」里选中 `.fpk` 安装，完成后从桌面图标打开：
 
 | 项 | 值 |
 | --- | --- |
-| 宿主机端口 | `18000`（来自 `manifest` 的 `service_port`） |
-| 容器端口 | `18000`（compose 里 `${TRIM_SERVICE_PORT}:18000`） |
+| 监听端口 | `18000`（来自 `manifest` 的 `service_port`） |
+| 应用目录 | `${TRIM_APPDEST}`（官方安装目录） |
 | 数据目录 | `${TRIM_PKGVAR}/data`，升级保留 |
+| 日志 | `${TRIM_PKGVAR}/hares-panel.log` |
 | 访问地址 | `http://<NAS IP>:18000` |
+| 架构 | x86_64（`platform=x86`） |
 
-> 应用包的价值是桌面入口、应用目录内的数据管理和升级管理；端口与镜像方式一致，都是 `18000:18000`。
+> 从旧的 Docker 版 `.fpk` 迁移：先卸载旧应用（可选择保留数据），再安装本原生包。
 
-重新打包需要 [fnpack](https://developer.fnnas.com/docs/cli/fnpack/)：在 `fnos/` 目录执行 `.\build.ps1 -Fnpack <fnpack.exe>`（Windows）或 `FNPACK=<fnpack> ./build.sh`（Linux/macOS），详见 [fnos/README.md](../fnos/README.md)。
+重新打包需要 **Node.js 24** 和 [fnpack](https://developer.fnnas.com/docs/cli/fnpack/)：在 `fnos/` 目录执行 `.\build.cmd -Fnpack <fnpack.exe>`（Windows）或 `FNPACK=<fnpack> ./build.sh`（Linux/macOS）。打包脚本会构建前端/服务端并下载 Linux Node 运行时打进 `.fpk`，详见 [fnos/README.md](../fnos/README.md)。
 
 ### 环境变量
 

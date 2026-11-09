@@ -107,7 +107,7 @@ function AddItemTile({ style, onClick }: { style: CardStyle; onClick: () => void
       onClick={onClick}
       className="nav-add-tile group flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-[var(--card-radius,16px)] py-0.5 text-[12px] font-medium"
     >
-      <span className="nav-add-tile-mark flex h-16 w-16 items-center justify-center rounded-[20px] transition-transform group-hover:scale-105">
+      <span className="nav-add-tile-mark flex h-16 w-16 items-center justify-center rounded-[var(--card-radius,16px)] transition-transform group-hover:scale-105">
         <Plus className="h-5 w-5" />
       </span>
       添加卡片

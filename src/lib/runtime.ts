@@ -113,6 +113,8 @@ export function describeDeployment(info: CloudHealth | null | undefined): string
       return 'EdgeOne Makers'
     case 'docker':
       return 'Docker 自托管'
+    case 'fnos':
+      return '飞牛 fnOS 原生应用'
     case 'node':
       return 'Node 服务'
     case 'local':

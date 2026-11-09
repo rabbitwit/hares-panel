@@ -60,6 +60,8 @@ function runtimeLabel(runtime: string | null | undefined): string {
       return 'EdgeOne'
     case 'docker':
       return 'Docker'
+    case 'fnos':
+      return '飞牛 fnOS'
     default:
       return runtime ?? '未知'
   }

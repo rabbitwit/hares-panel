@@ -53,7 +53,7 @@ Hares-Panel 是一个面向 NAS、家庭服务器和云主机的导航首页。�
 浏览器 SPA ──/api/*──> Cloudflare Worker（KV/D1 + R2）
                         或 Vercel Function（Upstash + Blob）
                         或 EdgeOne Makers Node Function（Blob）
-                        或 Docker 容器（Node 文件存储）
+                        或 Docker 容器 / 飞牛原生应用（Node 文件存储）
 ```
 
 - **服务端是唯一数据源**：启动时先请求 `/api/health`，再读取公开状态；管理员登录后读取完整状态。
@@ -87,6 +87,7 @@ edgeone.json                 # EdgeOne 构建、Node 版本与输出目录
 Dockerfile                   # Node 24 多阶段镜像
 docker/entrypoint.sh         # 首次密码与 Node 启动
 docker-compose.yml           # 默认编排：只发布面板高位端口
+fnos/                        # 飞牛 fnOS 原生应用包（不依赖 Docker）
 tests/                       # API、Worker/Vercel/EdgeOne/Docker 运行时测试与本地模拟后端
 src-tauri/                   # Tauri 2 桌面工程（待接入远程 API）
 ```
@@ -141,7 +142,7 @@ npm run dev
 
 ## 部署
 
-Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API 必须部署在同一个域下，**不能只托管 `dist/` 静态目录**。生产环境请选择下面四种方式之一：
+Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API 必须部署在同一个域下，**不能只托管 `dist/` 静态目录**。生产环境请选择下面方式之一：
 
 | 平台 | 导航数据 | 图片 / 图标 | 适合场景 |
 | --- | --- | --- | --- |
@@ -149,6 +150,7 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 | **Vercel** | Upstash Redis | Vercel Blob | 已在用 Vercel，希望从 Git 仓库自动部署 |
 | **EdgeOne Makers（国际版）** | EdgeOne Blob | EdgeOne Blob | 使用腾讯国际站，希望 Node Functions + Blob 一体化 |
 | **Docker 自托管** | 本地 `./data/state.json` | 本地 `./data/assets/` | 有 NAS / 云主机，想一条命令部署；公网可配合现有反代 |
+| **飞牛 fnOS 原生应用** | 应用数据目录 `state.json` | 应用数据目录 `assets/` | 飞牛 NAS，安装 `.fpk` 即可，不依赖 Docker |
 
 > 各平台的数据完全独立，不会自动同步。需要多端一致时，请用「管理控制台 → 实例同步」双向同步；
 > 切换平台请先阅读「数据迁移与备份」。
@@ -164,7 +166,8 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 - [Cloudflare Workers](docs/DEPLOYMENT.md#cloudflare-workers)（D1 + R2，或只用 KV）
 - [Vercel](docs/DEPLOYMENT.md#vercelupstash-redis--vercel-blob)（Upstash Redis + Vercel Blob）
 - [EdgeOne Makers](docs/DEPLOYMENT.md#edgeone-makers腾讯国际版)（Node Functions + Blob，国际版）
-- [Docker 自托管](docs/DEPLOYMENT.md#docker-自托管)（NAS / 云主机，含飞牛 fnOS 应用包）
+- [Docker 自托管](docs/DEPLOYMENT.md#docker-自托管)（NAS / 云主机）
+- [飞牛 fnOS 原生应用](docs/DEPLOYMENT.md#方式-e飞牛-fnos-原生应用包fpk)（`.fpk`，不依赖 Docker）
 - [部署后检查清单](docs/DEPLOYMENT.md#部署后检查清单)
 - [数据迁移与备份](docs/DEPLOYMENT.md#数据迁移与备份) · [实例同步](docs/DEPLOYMENT.md#实例同步)
 - [故障排查](docs/DEPLOYMENT.md#故障排查)
@@ -341,4 +344,6 @@ docker exec <容器名> cat /data/admin-password
 
 ## 许可
 
-本项目采用 [MIT](LICENSE) 许可证。
+本项目采用 [PolyForm Noncommercial License 1.0.0](LICENSE)。
+
+允许个人学习、自用、研究、教育以及非营利组织使用；**禁止任何商业用途**（包括但不限于售卖、收费托管、作为商业产品或服务的一部分提供）。完整条款见 [LICENSE](LICENSE)。

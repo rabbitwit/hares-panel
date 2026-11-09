@@ -158,7 +158,6 @@ export function NavPage() {
   const styleVars = {
     '--card-radius': `${config.cardRadius}px`,
     '--card-blur': config.glassEffect ? '14px' : '0px',
-    '--icon-radius': config.iconRadiusEnabled ? `${config.iconRadius}px` : '0px',
   } as CSSProperties
 
   const empty = visibleGroups.length === 0

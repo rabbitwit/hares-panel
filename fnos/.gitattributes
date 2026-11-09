@@ -1,4 +1,4 @@
 cmd/* text eol=lf
-app/docker/* text eol=lf
+app/bin/* text eol=lf
 manifest text eol=lf
 build.sh text eol=lf

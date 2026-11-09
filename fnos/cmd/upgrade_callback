@@ -1,3 +1,6 @@
 #!/bin/bash
-# Called after upgrade. Nothing to migrate.
+# Called after upgrade. Persistent data stays in TRIM_PKGVAR.
+# Re-apply execute bits on the bundled Node binary (copied from Windows).
+APP_DIR="${TRIM_APPDEST:-${TRIM_APP:-}}"
+chmod +x "${APP_DIR}/runtime/node" "${APP_DIR}/bin/hares-panel" 2>/dev/null || true
 exit 0

@@ -1,12 +1,14 @@
 #!/bin/bash
 # Called after install.
 # If the user set an admin password in the install wizard (wizard/install),
-# write it into the persistent data directory so the container entrypoint
-# uses it on first boot. If it is blank, the entrypoint auto-generates one.
+# write it into the persistent data directory so the first start uses it.
+# If it is blank, the launcher auto-generates one.
 DATA_DIR="${TRIM_PKGVAR}/data"
+APP_DIR="${TRIM_APPDEST:-${TRIM_APP:-}}"
 mkdir -p "$DATA_DIR"
 if [ -n "${wizard_admin_password:-}" ]; then
   printf '%s\n' "$wizard_admin_password" > "$DATA_DIR/admin-password"
   chmod 600 "$DATA_DIR/admin-password" 2>/dev/null || true
 fi
+chmod +x "${APP_DIR}/runtime/node" "${APP_DIR}/bin/hares-panel" 2>/dev/null || true
 exit 0

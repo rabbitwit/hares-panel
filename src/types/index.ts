@@ -90,7 +90,7 @@ export interface SiteConfig {
   cardRadius: number
   /** Whether icon corner rounding is enabled. When off, icons render square. */
   iconRadiusEnabled: boolean
-  /** Corner radius (px) of the icon tile in icon-style cards. */
+  /** Corner radius (px) of the icon artwork itself, not the surrounding card/tile. */
   iconRadius: number
   glowEffect: boolean
   /** Whether card backgrounds use a frosted-glass (backdrop blur) look. */
