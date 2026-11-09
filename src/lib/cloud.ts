@@ -189,11 +189,39 @@ function isHealth(value: unknown): value is CloudHealth {
 }
 
 export async function getCloudHealth(): Promise<CloudHealth | null> {
+  const probed = await probeCloudHealth()
+  return probed.info
+}
+
+export async function probeCloudHealth(): Promise<{ info: CloudHealth | null; error: string | null }> {
   try {
-    const payload = await api<CloudHealth>('/health', { timeoutMs: 3500 })
-    return isHealth(payload) ? payload : null
-  } catch {
-    return null
+    // Vercel Hobby cold start + Upstash ping can exceed 3s; 3.5s made a working
+    // function look like "API unreachable".
+    const payload = await api<CloudHealth>('/health', { timeoutMs: 15_000 })
+    if (!isHealth(payload)) {
+      return {
+        info: null,
+        error: '服务端 /api/health 返回了无法识别的数据（多半是网页而不是 JSON，说明 API 函数没有挂上）。',
+      }
+    }
+    return { info: payload, error: null }
+  } catch (error) {
+    if (error instanceof CloudApiError) {
+      if (error.code === 'timeout') {
+        return { info: null, error: '连接 /api/health 超时。请到 Vercel → Deployments → Functions 查看函数是否存在、是否冷启动过久。' }
+      }
+      if (error.code === 'bad_response') {
+        return { info: null, error: '访问 /api/health 没有返回 JSON。API 函数可能没部署，或被重写成了前端页面。' }
+      }
+      if (error.status === 404) {
+        return { info: null, error: '/api/health 返回 404，Vercel 没有挂上 API 函数。请拉取最新代码后 Redeploy。' }
+      }
+      if (error.status === 0 || error.code === 'network') {
+        return { info: null, error: '无法连接服务端 API（/api/health）。请直接在浏览器打开该地址，确认返回的是 JSON。' }
+      }
+      return { info: null, error: error.message }
+    }
+    return { info: null, error: '无法连接服务端 API（/api/health）。' }
   }
 }
 

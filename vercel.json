@@ -5,11 +5,14 @@
   "buildCommand": "node scripts/vercel-command.mjs npm run build",
   "outputDirectory": "dist",
   "functions": {
+    "api/index.ts": {
+      "maxDuration": 15
+    },
     "api/[...path].ts": {
-      "installCommand": ""
+      "maxDuration": 15
     }
   },
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/api/:path*", "destination": "/api?__hp=:path*" }],
   "headers": [
     {
       "source": "/assets/(.*)",

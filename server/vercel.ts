@@ -143,9 +143,61 @@ async function readRequestBody(request: IncomingMessage): Promise<Uint8Array<Arr
   return bytes
 }
 
+function firstHeader(request: IncomingMessage, name: string): string {
+  const value = request.headers[name]
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  if (Array.isArray(value)) {
+    const found = value.find((item) => typeof item === 'string' && item.trim())
+    if (found) return found.trim()
+  }
+  return ''
+}
+
+/** Make sure the function sees `/api/...` even if Vercel strips the prefix or rewrites to `/api`. */
+export function normalizeVercelApiPathname(pathname: string): string {
+  const clean = pathname.replace(/\/+$/, '') || '/'
+  if (clean === '/api' || clean.startsWith('/api/')) return clean
+  if (clean === '/') return '/api'
+  return `/api${clean.startsWith('/') ? clean : `/${clean}`}`
+}
+
+export function vercelRequestUrl(request: IncomingMessage): URL {
+  const host =
+    firstHeader(request, 'x-forwarded-host') || firstHeader(request, 'host') || 'localhost'
+  const proto = firstHeader(request, 'x-forwarded-proto') || 'https'
+  const base = `${proto}://${host}`
+  const forwarded =
+    firstHeader(request, 'x-forwarded-uri') ||
+    firstHeader(request, 'x-original-uri') ||
+    firstHeader(request, 'x-invoke-path')
+  const url = new URL(request.url || '/', base)
+
+  if (forwarded) {
+    try {
+      const headerUrl = new URL(forwarded, base)
+      if (headerUrl.pathname === '/api' || headerUrl.pathname.startsWith('/api/')) return headerUrl
+      if (headerUrl.pathname && headerUrl.pathname !== '/') {
+        headerUrl.pathname = normalizeVercelApiPathname(headerUrl.pathname)
+        return headerUrl
+      }
+    } catch {
+      // Fall through to req.url.
+    }
+  }
+
+  const routed = url.searchParams.get('__hp')
+  if (routed) {
+    url.searchParams.delete('__hp')
+    url.pathname = normalizeVercelApiPathname(`/${routed}`)
+    return url
+  }
+
+  url.pathname = normalizeVercelApiPathname(url.pathname)
+  return url
+}
+
 export async function toWebRequest(request: IncomingMessage): Promise<Request> {
-  const host = request.headers['x-forwarded-host'] || request.headers.host || 'localhost'
-  const url = new URL(request.url || '/', `https://${host}`)
+  const url = vercelRequestUrl(request)
   const headers = new Headers()
   for (const [key, value] of Object.entries(request.headers)) {
     if (typeof value === 'string') headers.set(key, value)

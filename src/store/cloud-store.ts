@@ -6,7 +6,7 @@ import {
   cloudLogin,
   fetchCloudState,
   fetchSyncMeta,
-  getCloudHealth,
+  probeCloudHealth,
   pushCloudState,
   refreshCloudSession,
   type CloudHealth,
@@ -93,7 +93,7 @@ export const useCloudStore = create<CloudState>()(
         bootStarted = true
         set({ status: 'checking', error: null })
 
-        const info = await getCloudHealth()
+        const { info, error: healthError } = await probeCloudHealth()
         if (!info || !info.ok || !info.storage) {
           set({
             status: 'unavailable',
@@ -101,7 +101,7 @@ export const useCloudStore = create<CloudState>()(
             loaded: true,
             error: info
               ? '服务端已响应，但尚未配置 KV / D1 / Upstash Redis / Docker 本地文件存储。'
-              : '无法连接服务端 API（/api/health）。',
+              : healthError || '无法连接服务端 API（/api/health）。',
           })
           return
         }

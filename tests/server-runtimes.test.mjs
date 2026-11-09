@@ -126,6 +126,22 @@ await test('health reports Redis storage without assets', async () => {
   assert.equal(body.assets, null)
 })
 
+await test('health works when Vercel strips the /api prefix', async () => {
+  const response = await fetch(`${origin}/health`)
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(body.ok, true)
+  assert.equal(body.storage, 'redis')
+})
+
+await test('health works when rewritten to /api?__hp=', async () => {
+  const response = await fetch(`${origin}/api?__hp=health`)
+  const body = await response.json()
+  assert.equal(response.status, 200)
+  assert.equal(body.ok, true)
+  assert.equal(body.storage, 'redis')
+})
+
 await test('login + authenticated state round-trip', async () => {
   const { response, body } = await login(origin)
   assert.equal(response.status, 200)

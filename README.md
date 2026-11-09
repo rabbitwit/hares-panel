@@ -164,7 +164,7 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 其中包含：
 
 - [Cloudflare Workers](docs/DEPLOYMENT.md#cloudflare-workers)（D1 + R2，或只用 KV）
-- [Vercel](docs/DEPLOYMENT.md#vercelupstash-redis--vercel-blob)（Upstash Redis + Vercel Blob）
+- [Vercel](docs/DEPLOYMENT.md#vercelupstash-redis--vercel-blob)（Upstash Redis + Vercel Blob；网页导入后必须先连存储再 Redeploy）
 - [EdgeOne Makers](docs/DEPLOYMENT.md#edgeone-makers腾讯国际版)（Node Functions + Blob，国际版）
 - [Docker 自托管](docs/DEPLOYMENT.md#docker-自托管)（NAS / 云主机）
 - [飞牛 fnOS 原生应用](docs/DEPLOYMENT.md#方式-e飞牛-fnos-原生应用包fpk)（`.fpk`，不依赖 Docker）
@@ -284,6 +284,8 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 ## 常见问题
 
 **页面显示「服务端尚未就绪」？** 检查 `/api/health` 是否返回 JSON 且 `ok: true`；确认已配置 KV/D1、Upstash Redis、EdgeOne Blob 或 Docker 的 `./data` 目录，并在对应平台设置了 `ADMIN_PASSWORD`（Docker 可留空自动生成）。Docker 还需确认宿主机 `18000` 已映射到容器 `18000`。
+
+**Vercel 网页部署后仍显示「服务端尚未就绪」？** 环境变量配齐后，请用浏览器直接打开 `https://你的域名.vercel.app/api/health`：应是 JSON 而不是导航页。若仍是网页或 404，需要部署包含 `api/index.ts` 的最新代码。完整步骤见 [部署指南 · Vercel](docs/DEPLOYMENT.md#方式-a网页控制台部署推荐)。
 
 **页面显示「站点尚未初始化」？** 服务端可用但没有数据。点击登录，输入 `ADMIN_PASSWORD`，登录后会把内置示例写入服务端。
 

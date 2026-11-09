@@ -23,7 +23,7 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 - [部署前准备](#部署前准备)
 - [通用环境变量](#通用环境变量)
 - [Cloudflare Workers](#cloudflare-workers)
-- [Vercel](#vercelupstash-redis--vercel-blob)
+- [Vercel](#vercelupstash-redis--vercel-blob)（[网页控制台](#方式-a网页控制台部署推荐) / [CLI](#方式-bcli-部署)）
 - [EdgeOne Makers](#edgeone-makers腾讯国际版)
 - [Docker 自托管](#docker-自托管)
 - [飞牛 fnOS 原生应用包](#方式-e飞牛-fnos-原生应用包fpk)
@@ -237,152 +237,156 @@ Vercel CDN ──> dist/ 静态前端
                        └─> Vercel Blob（图片）
 ```
 
-### 首次部署顺序（重要）
+网页导入 Git 仓库时，Vercel **会立刻开始第一次构建**。这次部署几乎必然还没有 Redis / Blob，打开网站会显示「服务端尚未就绪」。这不是构建失败，按下面 **步骤 1 → 6** 补齐存储后再 **Redeploy** 即可。
 
-首次部署请按 **先创建存储，后部署** 的顺序：
+控制台按钮以英文为准（界面语言也可能是中文，对一下表里的名称即可）。
 
-1. 在 Vercel 创建 / 导入项目（导入 Git 仓库时可能会自动生成一次初始部署，可以先忽略）；
-2. 在项目的 **Storage** 中创建并连接 **Upstash for Redis**；
-3. 在项目的 **Storage** 中创建并连接 **Blob**；
-4. 在 **Settings → Environment Variables** 设置 `ADMIN_PASSWORD`（可选 `SESSION_SECRET`），至少勾选 **Production**；
-5. 再执行首次正式部署：Git 推送，或本地执行 `npm run deploy:vercel`；
-6. 打开域名初始化，并访问 `/api/health` 验证 `storage` 为 `redis`、`assets` 为 `blob`。
+### 网页部署为什么经常不成功
 
-以上存储和变量也可以全程用 CLI 完成（见下文「方式 C」），不需要先打开网页。关键不是“部署几次”，而是**存储和变量必须在正式部署之前配置好**。
+| 你看到的现象 | 真正原因 | 怎么处理 |
+| --- | --- | --- |
+| 构建是绿色 Ready，页面却写「服务端尚未就绪」 | 第一次部署时还没连接 Redis / Blob，或连完后没有 Redeploy | 按步骤 3–6 做完，再看 `/api/health` |
+| `/api/health` 里 `"storage": null` | 没连上 Upstash Redis，或只勾了 Development / Preview | 补 REST 变量，勾选 **Production**，Redeploy |
+| `/api/health` 里 `"assets": null` | 没连上 Blob | 创建 Blob 并连接到当前项目，Redeploy |
+| `/api/health` 里 `"auth": false` | 没设 `ADMIN_PASSWORD`，或没勾 Production | 补变量后 Redeploy |
+| 构建 Error，日志里是 `next build` | Framework Preset 被改成了 Next.js | 改回 **Vite**，不要 Override 构建命令 |
+| 构建 Error / 导入不到仓库 | 仓库在 Gitee，或只上传了 `dist/` | 必须用 GitHub / GitLab / Bitbucket 上的**完整源码** |
+| 登录 401 | 密码和变量值不一致，或看的是 Preview 域名 | 用 Production 域名，密码不要多空格 |
 
-> 核心规则：**环境变量只对之后创建的部署生效。** 如果你先部署、后连接 Redis / Blob，已有部署不会自动生效，必须在连接完成后重新部署（Redeploy）一次。
->
-> 使用 CLI 时，可以先执行 `vercel link` 创建并关联项目（不会立即部署），再连接存储和设置变量（网页或方式 C 均可），最后执行 `npm run deploy:vercel`，这样第一次部署就是配置完整的。
+> 核心规则：**环境变量（含 Redis / Blob 自动写入的变量）只对之后创建的部署生效。** 先 Deploy、后连存储，一定要再 Redeploy 一次。
 
-### 1. 导入项目
+### 方式 A：网页控制台部署（推荐）
 
-在 Vercel Dashboard 选择 **Add New → Project**，导入 Git 仓库。构建配置：
+#### 0. 开始前确认
 
-| 配置项 | 值 |
+1. 源码已推到 **GitHub / GitLab / Bitbucket**。Vercel 网页**不能**导入 Gitee / 码云，也不能只上传 `dist/`。
+2. 仓库根目录能看到 `package.json`、`vercel.json`、`api/`、`server/`、`src/`。缺任何一个都不是完整项目。
+3. 准备好管理员密码。它只放在 Vercel 环境变量里，不要写进代码。
+4. 用 GitHub 登录 [vercel.com](https://vercel.com) 后，先到账号设置里完成邮箱验证，否则部分 Storage 会创建失败。
+
+本地不一定要先 `npm run build`。网页部署是 Vercel 在云端构建，不读取你电脑上的 `dist/` 或 `.env`。
+
+#### 1. 导入 Git 仓库
+
+1. 打开 [Vercel Dashboard](https://vercel.com/dashboard)。
+2. 右上角 **Add New… → Project**（或直接打开 [vercel.com/new](https://vercel.com/new)）。
+3. 在 **Import Git Repository** 里选中本仓库。若列表是空的：点 **Adjust GitHub App Permissions**（GitLab / Bitbucket 同理），把仓库授权给 Vercel。
+4. 进入 **Configure Project** 后核对：
+
+| 配置项 | 应保持 |
 | --- | --- |
-| Framework Preset | Vite |
-| Root Directory | 仓库根目录 |
-| Install Command | `node scripts/vercel-command.mjs npm install` |
-| Build Command | `node scripts/vercel-command.mjs npm run build` |
-| Output Directory | `dist` |
+| Framework Preset | **Vite**。仓库里有 `api/` 目录，**不要改成 Next.js** |
+| Root Directory | 仓库根目录，不要选 `dist`、`api`、`fnos` |
+| Build and Output Settings | **不要打开 Override**。`vercel.json` 已经写了安装 / 构建命令和输出目录 `dist` |
 
-仓库里的 `vercel.json` 已经声明了上述安装 / 构建命令、Vite 构建和静态资源回退；Dashboard 中保持默认即可，实际执行以 `vercel.json` 为准。`api/[...path].ts` 会被 Vercel 自动识别为 API Function，不需要单独配置路由。
+5. 展开 **Environment Variables**，现在就可以先加管理员密码（三个环境都勾上）：
 
-### 2. 创建 Upstash Redis
+   | Key | Value | Environments |
+   | --- | --- | --- |
+   | `ADMIN_PASSWORD` | 你的管理员密码 | Production、Preview、Development |
+   | `SESSION_SECRET` | 可选，一串随机字符 | 同上 |
 
-在 Vercel 项目的 **Storage / Marketplace** 中添加 **Upstash Redis**，创建后连接到当前项目。
+6. 点 **Deploy**，等到 Deployments 里这条变成绿色 **Ready**。
 
-连接成功后应生成以下环境变量之一：
+这次部署只证明「源码能构建」。打开域名若提示「服务端尚未就绪」，先不要反复点 Deploy，继续做步骤 2–6。
 
-```text
-KV_REST_API_URL
-KV_REST_API_TOKEN
-# 或
-UPSTASH_REDIS_REST_URL
-UPSTASH_REDIS_REST_TOKEN
-```
+如果这条就是红色 **Error**：点进去看 Building 日志，先不要去建 Redis。常见原因见上文表格。
 
-代码优先读取 `KV_REST_API_*`，也兼容 `UPSTASH_REDIS_REST_*`。必须是 **REST URL + REST Token**，不能只填 Redis TCP 地址。
+#### 2. 确认 Node.js 版本
 
-### 3. 创建 Vercel Blob
+1. 打开该项目 → **Settings → General**。
+2. 找到 **Node.js Version**，选 **24.x** 后保存。
+3. 这里改版本不会自动重新部署，等步骤 6 一起 Redeploy。
 
-在 **Storage** 中添加 **Blob**，连接到当前项目，确认已生成：
+下拉里如果暂时没有 24.x，选 22.x 也可以跑；构建日志里可能会出现 `EBADENGINE` 警告，可以忽略。
 
-```text
-BLOB_READ_WRITE_TOKEN
-```
+#### 3. 创建并连接 Vercel Blob（图片）
 
-> 连接 Blob 会自动添加环境变量，但**只对之后创建的部署生效**。如果项目已经部署过，必须重新部署（Redeploy）一次；否则 `/api/health` 仍会显示 `"assets": null`。
+1. 打开该项目 → 左侧或顶部的 **Storage**。
+2. 点 **Create Database** / **Browse Marketplace** / **Browse Storage**（不同账号入口文案不一样）。
+3. 选择 **Blob**（Vercel 自带，不要选 Edge Config、Postgres）。
+4. Store 名称例如 `hares-panel-blob`。
+5. 连接当前项目，**Environments 必须勾选 Production**，建议同时勾选 Preview、Development。
+6. 创建完成后，到 **Settings → Environment Variables** 确认已出现：
 
-代码上传时使用 `access: 'public'`，图片由 Vercel Blob CDN 提供，不经过 Function 回源。Blob 中的图片是公开可访问的，请勿上传敏感图片。
+   ```text
+   BLOB_READ_WRITE_TOKEN
+   ```
 
-### 4. 设置环境变量
+如果变量在列表里，但 Production 那一列没有勾选，编辑该变量把 Production 打开。
 
-在 Vercel 项目 → **Settings → Environment Variables** 添加：
+代码上传时使用 `access: 'public'`，图片由 Vercel Blob CDN 提供，不经过 Function 回源。Blob 里的图片是公开可访问的，请勿上传敏感图片。
 
-```text
-ADMIN_PASSWORD=你的管理员密码
-SESSION_SECRET=可选的随机字符串
-```
+#### 4. 创建并连接 Upstash Redis（导航数据）
 
-`ADMIN_PASSWORD` 必填；`SESSION_SECRET` 可选，但建议生产环境设置。至少勾选 **Production**，如果使用预览部署也勾选 Preview。
+必须用 **Redis REST**。不要选 Upstash Vector / QStash / Search，也不要只填 `rediss://` TCP 地址。
 
-### 5. 部署
+**做法 1：在 Vercel Marketplace 安装（优先）**
 
-**方式 A：Git 自动部署**
+1. 仍在项目的 **Storage** 页，点 **Create Database** / **Browse Marketplace**。
+2. 选择 **Upstash** 或 **Upstash for Redis**。
+3. 若提示 Install Integration：允许 Upstash 访问当前 Vercel 账号，按浏览器跳转完成授权（这是 Upstash 第三方 OAuth，不是让你回 Vercel 手动建库）。
+4. 创建 Redis 数据库。免费套餐即可；地区建议选离你较近的，例如 `ap-southeast-1`（新加坡）。
+5. 连接到**当前这个** Vercel 项目，Environments 同样勾上 **Production**（建议加上 Preview）。
+6. 回到 **Settings → Environment Variables**，Upstash 会一次性写入一整组变量，名称类似：
 
-把代码推送到已连接的 Git 仓库，Vercel 会自动构建并部署。
+   ```text
+   KV_REST_API_URL                 ← 本项目要用
+   KV_REST_API_TOKEN               ← 本项目要用
+   KV_REST_API_READ_ONLY_TOKEN     ← 可忽略
+   KV_URL                          ← 可忽略（rediss:// TCP）
+   REDIS_URL                       ← 可忽略（rediss:// TCP）
+   ```
 
-**方式 B：CLI 部署**
+   这是 Vercel Marketplace 的命名（沿用以前的 Vercel KV）。**不要再手建一份** `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`，有 `KV_REST_API_URL` + `KV_REST_API_TOKEN` 就够了。代码两种名字都认，优先读 `KV_REST_API_*`。
 
-```bash
-npm i -g vercel
-vercel login
-vercel link
-npm run deploy:vercel
-```
+**做法 2：在 Upstash 控制台建库，再把 REST 变量贴进 Vercel**
 
-`npm run deploy:vercel` 会先在本地执行 `npm run build` 做一次类型检查和打包预检，再执行 `vercel --prod`。真正用于生产部署的产物仍由 Vercel 在云端重新构建，本地构建结果不会直接上传。首次执行 `vercel link` 时按提示选择 / 创建项目，这一步不会立即部署；请先完成 Redis / Blob 连接和环境变量设置，再执行 `npm run deploy:vercel`。
+Marketplace 授权失败、页面打不开、或你已经有 Upstash 账号时用这个：
 
-**方式 C：纯 CLI 首次部署（存储也走 CLI）**
+1. 打开 [Upstash Console](https://console.upstash.com/) → **Redis → Create Database**。
+2. 建好后打开数据库，找到 **REST API** 卡片，复制：
+   - `UPSTASH_REDIS_REST_URL`（一定是 `https://….upstash.io`）
+   - `UPSTASH_REDIS_REST_TOKEN`
+3. 不要复制 **Redis URL** / `rediss://` / 端口 `6379`。
+4. 回到 Vercel → **Settings → Environment Variables**，把这两个变量加进去，**Production 必须勾选**。
 
-Vercel CLI 可以直接创建 / 连接 Blob，也支持安装 Upstash Redis，不需要先去网页端手动建库：
+#### 5. 核对环境变量（Redeploy 前最后一眼）
 
-```bash
-vercel login
-vercel link
+打开 **Settings → Environment Variables**。连完 Marketplace 之后，列表通常比「本项目真正读取的」更长，例如：
 
-# 1. Blob：创建并连接 Blob store
-vercel storage create hares-panel-blob --type blob --access public
-vercel storage connect hares-panel-blob --add-rw-token --yes --environment production --environment preview
+| 变量 | 本项目用不用 | 说明 |
+| --- | --- | --- |
+| `ADMIN_PASSWORD` | **要用** | 你手填的管理员密码 |
+| `SESSION_SECRET` | 可选 | 没有也能登录；建议生产环境补一个随机串 |
+| `KV_REST_API_URL` | **要用** | Upstash REST 地址，应是 `https://…` |
+| `KV_REST_API_TOKEN` | **要用** | Upstash REST 读写 token |
+| `BLOB_READ_WRITE_TOKEN` | **要用** | 连接 Blob 后自动出现，类型一般是 Secret |
+| `KV_REST_API_READ_ONLY_TOKEN` | 不用 | Marketplace 顺带写入 |
+| `KV_URL` / `REDIS_URL` | 不用 | TCP 地址，本项目不连 6379 |
+| `BLOB_STORE_ID` / `BLOB_WEBHOOK_PUBLIC_KEY` | 不用 | 连接 Blob 后自动出现 |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 备用 | 只有在 Upstash 控制台手贴变量时才会有；已有 `KV_REST_API_*` 就不必再加 |
 
-# 2. Upstash Redis：通过 Marketplace 安装并连接
-vercel install upstash
-# 按提示选择 Upstash for Redis；若要求登录/授权，会在浏览器完成
-# 成功后自动写入 KV_REST_API_* 或 UPSTASH_REDIS_REST_* 环境变量
+黄色 **Needs Attention** 只是 Vercel 提醒「这像密钥但类型是 Config，可以改成 Secret」，**不是值填错了**，可以不管。`Rotate Upstash Secrets` 也先别点，除非 token 已经泄露。
 
-# 3. 设置管理员密码
-vercel env add ADMIN_PASSWORD production
+环境范围是 **Production and Preview** 即可，不必有 Development。缺哪一项「要用」的就回去补，不要手改 Blob / Redis 的 token。本地 `.env` **不会**同步到 Vercel。
 
-# 4. 存储和变量都就绪后，只部署一次
-npm run deploy:vercel
-```
+#### 6. 重新部署（必做）
 
-说明：
+连完存储或改过变量之后，旧的那次绿色部署仍然读不到新值。
 
-- 先执行 `vercel storage status` 可以查看当前已创建的存储，**已存在就不要重复 `storage create`**，否则会创建新的 Blob store；
-- `vercel install upstash` 可能打开浏览器做 Upstash 账号授权，这是第三方 OAuth，不是让你去 Vercel 网页手动建库；
-- 不想使用 Vercel Marketplace 的 Upstash 时，可以直接在 Upstash 创建数据库，然后用 CLI 写入变量：
+1. 打开项目 → **Deployments**。
+2. 找到当前 **Production** 那一条（不要拿带 git 分支名、随机 hash 的 Preview 当正式站）。
+3. 右侧 **⋯ → Redeploy**。
+4. 弹出框里可以保留 **Use existing Build Cache**；点 **Redeploy**。
+5. 等到新记录变成绿色 **Ready**，再打开 Overview 上的 Production 域名。
 
-  ```bash
-  vercel env add UPSTASH_REDIS_REST_URL production --value "https://..."
-  vercel env add UPSTASH_REDIS_REST_TOKEN production --value "..."
-  ```
+不要用 Instant Rollback，那会回到更旧的部署。
 
-- `vercel deploy` 本身不会创建 Redis / Blob，也不会读取本地 `.env`；它只部署代码，并绑定部署创建时项目里已有的变量。所以存储要在 `deploy` 之前配置，但**只需要部署一次**。
+#### 7. 验证是否真的可用
 
-### Vercel 实际执行顺序
-
-无论是 Git 自动部署还是 `vercel --prod`，Vercel 都在云端按以下顺序执行：
-
-1. **上传源码**：CLI / Git 把项目文件上传到 Vercel；
-2. **Install**：执行 `vercel.json` 中的
-   `node scripts/vercel-command.mjs npm install`。
-   wrapper 先把 Vercel 注入的 `NPM_CONFIG_CACHE_DIR` 转换成 npm 认识的 `npm_config_cache`，再执行 `npm install`，避免 `Unknown env config "cache-dir"` 警告；
-3. **Build**：执行 `vercel.json` 中的
-   `node scripts/vercel-command.mjs npm run build`。
-   依次运行 `tsc --noEmit`、`vite build`、`scripts/build-edgeone.mjs`，生成 `dist/` 和 `cloud-functions/api/[[default]].js`；
-4. **Function 打包**：Vercel 的 Node Builder 处理 `api/[...path].ts`。`vercel.json` 中已为该函数设置 `"installCommand": ""`，跳过函数级重复安装（根目录依赖已在第 2 步安装完成），因此不会再次触发 npm 警告；
-5. **部署产物**：`dist/` 静态文件进入 CDN，API 入口打包为 Node Function；环境变量在创建本次部署时绑定。
-
-> 环境变量（包括连接 Upstash Redis / Blob 自动生成的变量）只对**之后创建的部署**生效。已经部署的 Function 不会自动读取新增变量，必须重新部署（Redeploy）。
-
-### 6. 初始化与验证
-
-1. 打开 Vercel 分配的域名；
-2. 显示「站点尚未初始化」时，点击「使用管理员密码登录」，输入 `ADMIN_PASSWORD`；
-3. 登录成功后会把内置示例写入 Upstash Redis；
-4. 访问 `/api/health`，正常结果应类似：
+1. 打开 Production 域名，后面加上 `/api/health`，例如 `https://你的项目.vercel.app/api/health`。
+2. 正常应返回：
 
    ```json
    {
@@ -394,21 +398,94 @@ npm run deploy:vercel
    }
    ```
 
-如果 `storage` 为 `null`，检查 Upstash REST 环境变量；如果 `assets` 为 `null`，检查 `BLOB_READ_WRITE_TOKEN`；如果 `auth` 为 `false`，检查 `ADMIN_PASSWORD` 是否已应用到当前环境。新增或修改环境变量后，需要对当前环境重新部署（Redeploy），已有部署不会自动读取新值。
+3. 对照：
+   - `storage` 为 `null` → Redis REST 变量没进 **Production**，或还在用 Redeploy 之前的部署；
+   - `assets` 为 `null` → 缺少 `BLOB_READ_WRITE_TOKEN`；
+   - `auth` 为 `false` → 缺少 `ADMIN_PASSWORD`；
+   - 打开 `/api/health` 却是前端页面 / 404 → 构建时 Framework 被改成了 Next.js，或 Output Directory 被改成了别的目录。到 Settings → General / Build 把 Override 关掉后 Redeploy。
+4. `ok: true` 之后再打开首页。若显示「站点尚未初始化」，点「使用管理员密码登录」，输入 `ADMIN_PASSWORD`。登录成功会把内置示例写入 Redis。
 
-### 7. 自定义域名、日志与更新
+#### 8. 自定义域名、日志与以后更新
 
-- **自定义域名**：Vercel 项目 → Settings → Domains，添加域名并按提示配置 DNS；
-- **日志**：Vercel 项目 → Deployments → 选择部署 → Functions / Logs；
-- **更新代码**：Git 推送或再次执行 `npm run deploy:vercel`。Redis 和 Blob 中的数据不会被覆盖；
-- **环境变量修改**：修改后需要重新部署（Redeploy）才会应用到运行中的 Function。
+- **自定义域名**：Settings → Domains，添加域名并按提示改 DNS；
+- **日志**：Deployments → 点进某次部署 → **Functions** / **Logs**，看登录、保存、上传报错；
+- **更新代码**：往已连接的 Git 仓库推送即可自动部署。Redis 和 Blob 里的数据不会被覆盖；
+- **改密码 / 改变量**：保存环境变量后必须再 Redeploy，已上线的 Function 不会自己热更新。
 
-### 8. 注意事项
+### 方式 B：CLI 部署
 
-- Vercel Function 请求体上限约 **4.5 MB**；前端会压缩普通图片，但超大原图 / GIF / SVG 可能失败。需要大图时请改用图片 URL 或 Cloudflare R2；
-- 未配置 Upstash Redis 时，`/api/health` 返回 `ok: false`，页面显示「服务端尚未就绪」；
-- Blob 只保存图片，导航状态仍在 Redis；两者需要同时配置；
-- Vercel 的 Serverless Function 有执行时长限制，普通登录 / 保存 / 上传不受影响。
+适合仓库不在 GitHub（例如只在 Gitee / 本机），或网页 Marketplace 授权失败时。CLI 从**当前目录源码**上传，不经过 Gitee。
+
+```bash
+npm i -g vercel
+vercel login
+vercel link
+```
+
+`vercel link` 只关联项目，**不会部署**。先用网页或下面方式 C 把 Redis、Blob、`ADMIN_PASSWORD` 配好，再执行：
+
+```bash
+npm run deploy:vercel
+```
+
+这条命令会先在本地 `npm run build` 做预检，再执行 `vercel --prod`。生产环境仍由 Vercel 云端重新构建，本地 `dist/` 不会直接当生产产物上传。
+
+以后改代码可以继续 `npm run deploy:vercel`，也可以把仓库连上 Git 后改用推送自动部署。
+
+### 方式 C：存储也用 CLI 创建
+
+不想在网页点 Storage 时：
+
+```bash
+vercel login
+vercel link
+
+# 1. Blob
+vercel storage create hares-panel-blob --type blob --access public
+vercel storage connect hares-panel-blob --add-rw-token --yes --environment production --environment preview
+
+# 2. Upstash Redis（Marketplace；可能打开浏览器做 Upstash 授权）
+vercel install upstash
+# 按提示选 Upstash for Redis，成功后写入 KV_REST_API_* 或 UPSTASH_REDIS_REST_*
+
+# 3. 管理员密码
+vercel env add ADMIN_PASSWORD production
+
+# 4. 只部署一次
+npm run deploy:vercel
+```
+
+说明：
+
+- 先跑 `vercel storage status`。Blob 已经存在就不要再 `storage create`，否则会新建另一个 store；
+- 不想走 Marketplace 时，在 Upstash 控制台建库，把 REST 变量写进去：
+
+  ```bash
+  vercel env add UPSTASH_REDIS_REST_URL production --value "https://..."
+  vercel env add UPSTASH_REDIS_REST_TOKEN production --value "..."
+  ```
+
+- `vercel deploy` / `npm run deploy:vercel` **不会**创建 Redis / Blob，也**不会**读取本地 `.env`。它只部署代码，并绑定「创建这次部署时」项目里已经有的变量。
+
+### 云端构建实际做了什么
+
+无论是网页 Redeploy、Git 推送还是 `vercel --prod`，Vercel 都在云端按这个顺序执行：
+
+1. 上传源码（不是你本地的 `dist/`）；
+2. 执行 `vercel.json` 里的 `node scripts/vercel-command.mjs npm install`；
+3. 执行 `node scripts/vercel-command.mjs npm run build`（`tsc --noEmit`、`vite build`，以及 EdgeOne 函数文件生成）；
+4. 把 `api/[...path].ts` 打成 Node Function，把 `dist/` 放到 CDN；
+5. 把**这一次部署创建时**已经存在的环境变量注入 Function。
+
+所以：Storage 连上了但没 Redeploy = 线上还是旧变量 = `/api/health` 仍然是 `null`。
+
+### 注意事项
+
+- Vercel Function 请求体上限约 **4.5 MB**；前端会压缩普通图片，超大原图 / GIF / SVG 可能失败。需要大图时改用图片 URL，或换 Cloudflare R2 / Docker；
+- 未配置 Redis 时 `/api/health` 为 `ok: false`，页面显示「服务端尚未就绪」；
+- Blob 只存图片，导航状态在 Redis，两套都要连；
+- 普通登录 / 保存 / 上传不会碰到 Function 超时；
+- Hobby 免费额度够个人导航站使用。
 
 ---
 
@@ -876,6 +953,18 @@ Sun-Panel 导入规则：
 ## 故障排查
 
 **页面显示「服务端尚未就绪」？** 检查 `/api/health` 是否返回 JSON 且 `ok: true`；确认已配置 KV/D1、Upstash Redis、EdgeOne Blob 或 Docker 的 `./data` 目录，并在对应平台设置了 `ADMIN_PASSWORD`（Docker 可留空自动生成）。Docker 还需确认宿主机 `18000` 已映射到容器 `18000`。
+
+**Vercel 网页部署后仍显示「服务端尚未就绪」？** 先看页面上的具体句子，再在浏览器打开 Production 域名的 `/api/health`（不要用带 hash 的 Preview 地址）：
+
+- 返回 JSON 且 `storage` 为 `null`：Redis REST 没进 **Production**，或连完存储后没有 Redeploy；
+- 返回 JSON 且 `assets` 为 `null`：缺少 `BLOB_READ_WRITE_TOKEN`；
+- 返回 JSON 且 `auth` 为 `false`：缺少 `ADMIN_PASSWORD`；
+- 返回的是前端网页、空白或 404：API 函数没挂上。确认仓库包含 `api/index.ts` 和 `api/[...path].ts`，Framework 是 Vite，然后 **Redeploy**；
+- 一直转圈 / 超时：Hobby 冷启动加上 Upstash 可能超过几秒，等 10 秒再点「重新检测」。
+
+环境变量列表里多出来的 `KV_URL`、`REDIS_URL`、`BLOB_STORE_ID` 可以忽略。详细点击步骤见 [Vercel 网页控制台部署](#方式-a网页控制台部署推荐)。
+
+**Vercel 导入失败或构建报 `next build`？** 网页只能导入 GitHub / GitLab / Bitbucket 上的完整源码，不能导入 Gitee，也不能只上传 `dist/`。Configure Project 时 Framework Preset 必须是 **Vite**（仓库有 `api/` 也不要改成 Next.js），不要 Override 构建命令。仓库不在 GitHub 时改用 [CLI 部署](#方式-bcli-部署)。
 
 **页面显示「站点尚未初始化」？** 服务端可用但没有数据。点击登录，输入 `ADMIN_PASSWORD`，登录后会把内置示例写入服务端。
 
