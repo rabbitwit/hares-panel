@@ -959,7 +959,8 @@ Sun-Panel 导入规则：
 - 返回 JSON 且 `storage` 为 `null`：Redis REST 没进 **Production**，或连完存储后没有 Redeploy；
 - 返回 JSON 且 `assets` 为 `null`：缺少 `BLOB_READ_WRITE_TOKEN`；
 - 返回 JSON 且 `auth` 为 `false`：缺少 `ADMIN_PASSWORD`；
-- 返回的是前端网页、空白或 404：API 函数没挂上。确认仓库包含 `api/index.ts` 和 `api/[...path].ts`，Framework 是 Vite，然后 **Redeploy**；
+- 返回的是前端网页、空白或 404：API 函数没挂上。确认仓库包含 `api/health.ts`，Framework 是 Vite，然后 **Redeploy**；
+- 返回 500：函数启动失败。拉取包含 `api/health.ts` 的最新代码后再 Redeploy，不要用带 `__hp` 查询参数的旧 rewrite；
 - 一直转圈 / 超时：Hobby 冷启动加上 Upstash 可能超过几秒，等 10 秒再点「重新检测」。
 
 环境变量列表里多出来的 `KV_URL`、`REDIS_URL`、`BLOB_STORE_ID` 可以忽略。详细点击步骤见 [Vercel 网页控制台部署](#方式-a网页控制台部署推荐)。

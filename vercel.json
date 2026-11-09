@@ -5,6 +5,9 @@
   "buildCommand": "node scripts/vercel-command.mjs npm run build",
   "outputDirectory": "dist",
   "functions": {
+    "api/health.ts": {
+      "maxDuration": 15
+    },
     "api/index.ts": {
       "maxDuration": 15
     },
@@ -12,7 +15,6 @@
       "maxDuration": 15
     }
   },
-  "rewrites": [{ "source": "/api/:path*", "destination": "/api?__hp=:path*" }],
   "headers": [
     {
       "source": "/assets/(.*)",

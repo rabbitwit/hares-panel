@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { del, put } from '@vercel/blob'
 import type { ApiConfig, AssetStore, StateStore, SyncMeta } from './core'
 
 export interface VercelEnv {
@@ -92,6 +91,7 @@ function blobAssetStore(token: string): AssetStore {
   return {
     kind: 'blob',
     async putAsset(key, bytes, contentType) {
+      const { put } = await import('@vercel/blob')
       const blob = await put(`${ASSET_PREFIX}/${key}`, new Blob([bytes], { type: contentType }), {
         access: 'public',
         token,
@@ -107,6 +107,7 @@ function blobAssetStore(token: string): AssetStore {
       return null
     },
     async deleteAsset(key, url) {
+      const { del } = await import('@vercel/blob')
       await del(url || key, { token })
     },
   }
@@ -170,7 +171,12 @@ export function vercelRequestUrl(request: IncomingMessage): URL {
     firstHeader(request, 'x-forwarded-uri') ||
     firstHeader(request, 'x-original-uri') ||
     firstHeader(request, 'x-invoke-path')
-  const url = new URL(request.url || '/', base)
+  let url: URL
+  try {
+    url = new URL(request.url || '/', base)
+  } catch {
+    url = new URL('/api/health', base)
+  }
 
   if (forwarded) {
     try {
