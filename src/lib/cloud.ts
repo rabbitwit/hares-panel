@@ -3,7 +3,7 @@ import type { AppData } from '@/types'
 export const CLOUD_API_BASE = '/api'
 
 export type CloudStorageKind = 'kv' | 'd1' | 'redis' | 'edgeone-blob' | 'file'
-export type CloudAssetKind = 'r2' | 'blob' | 'edgeone-blob' | 'file'
+export type CloudAssetKind = 'r2' | 'kv' | 'blob' | 'edgeone-blob' | 'file'
 
 export interface CloudHealth {
   app?: string
@@ -61,6 +61,12 @@ export interface CloudSyncMeta {
   error?: string
 }
 
+export interface CloudSyncInstanceSummary {
+  runtime: string | null
+  storage: string | null
+  assets: string | null
+}
+
 export interface CloudSyncRemoteSummary {
   app: string
   version: number | null
@@ -88,6 +94,7 @@ export interface CloudSyncResult {
   localUpdatedAt: number | null
   remoteUpdatedAt: number | null
   updatedAt: number | null
+  local?: CloudSyncInstanceSummary
   remote: CloudSyncRemoteSummary
   empty?: boolean
   assets?: CloudSyncAssetSummary
@@ -383,7 +390,7 @@ export function cloudStorageLabel(kind: CloudStorageKind | null | undefined): st
     case 'file':
       return 'Docker 本地文件'
     default:
-      return '未配置'
+      return kind || '未配置'
   }
 }
 
@@ -391,6 +398,8 @@ export function cloudAssetLabel(kind: CloudAssetKind | null | undefined): string
   switch (kind) {
     case 'r2':
       return 'Cloudflare R2'
+    case 'kv':
+      return 'Cloudflare KV'
     case 'blob':
       return 'Vercel Blob'
     case 'edgeone-blob':
@@ -398,6 +407,6 @@ export function cloudAssetLabel(kind: CloudAssetKind | null | undefined): string
     case 'file':
       return 'Docker 本地文件'
     default:
-      return '未配置'
+      return kind || '未配置'
   }
 }

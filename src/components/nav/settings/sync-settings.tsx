@@ -374,13 +374,20 @@ export function SyncSettingsPanel() {
                 <HardDrive className="h-3 w-3" />
                 数据 {cloudStorageLabel(result.remote.storage as CloudStorageKind | null)}
               </Badge>
-              {result.remote.assets && (
-                <Badge variant="outline" className="gap-1 font-normal">
-                  <HardDrive className="h-3 w-3" />
-                  图片 {cloudAssetLabel(result.remote.assets as CloudAssetKind | null)}
-                </Badge>
-              )}
+              <Badge variant="outline" className="gap-1 font-normal">
+                <HardDrive className="h-3 w-3" />
+                图片 {cloudAssetLabel(result.remote.assets as CloudAssetKind | null)}
+              </Badge>
             </div>
+            {result.local && (
+              <div className="text-[11px] text-muted-foreground">
+                本机 {runtimeLabel(result.local.runtime)}
+                {' · '}
+                数据 {cloudStorageLabel(result.local.storage as CloudStorageKind | null)}
+                {' · '}
+                图片 {cloudAssetLabel(result.local.assets as CloudAssetKind | null)}
+              </div>
+            )}
 
             {result.action === 'sync' && (
               <div className="grid gap-2 text-[11px] text-muted-foreground sm:grid-cols-2">

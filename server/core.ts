@@ -45,7 +45,7 @@ export interface StoredAsset {
 }
 
 export interface AssetStore {
-  kind: 'r2' | 'blob' | 'edgeone-blob' | 'file'
+  kind: 'r2' | 'kv' | 'blob' | 'edgeone-blob' | 'file'
   putAsset(
     key: string,
     bytes: Uint8Array<ArrayBuffer>,

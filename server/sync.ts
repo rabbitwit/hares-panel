@@ -70,6 +70,12 @@ export interface SyncRemoteSummary {
   limits: { stateBytes: number; assetBytes: number } | null
 }
 
+export interface SyncInstanceSummary {
+  runtime: string | null
+  storage: string | null
+  assets: string | null
+}
+
 export interface SyncResult {
   ok: true
   action: SyncAction
@@ -78,6 +84,7 @@ export interface SyncResult {
   localUpdatedAt: number | null
   remoteUpdatedAt: number | null
   updatedAt: number | null
+  local: SyncInstanceSummary
   remote: SyncRemoteSummary
   empty?: boolean
   assets?: AssetTransferSummary
@@ -937,6 +944,11 @@ export async function performSync(
   }
 
   const remoteInfo = remoteSummary(remote.health)
+  const localInfo = {
+    runtime: config.runtime ?? null,
+    storage: config.state?.kind ?? null,
+    assets: config.assets?.kind ?? null,
+  }
   const localUpdatedAt = localState?.updatedAt ?? null
   const remoteUpdatedAt = remoteState?.updatedAt ?? null
 
@@ -949,6 +961,7 @@ export async function performSync(
       localUpdatedAt,
       remoteUpdatedAt,
       updatedAt: null,
+      local: localInfo,
       remote: remoteInfo,
       empty: remoteState === null,
     }
@@ -989,6 +1002,7 @@ export async function performSync(
       localUpdatedAt,
       remoteUpdatedAt,
       updatedAt: null,
+      local: localInfo,
       remote: remoteInfo,
       warnings: ['两端导航内容已经一致，没有传输数据。'],
     }
@@ -1016,6 +1030,7 @@ export async function performSync(
       localUpdatedAt,
       remoteUpdatedAt,
       updatedAt,
+      local: localInfo,
       remote: remoteInfo,
       assets,
       warnings: assets.warnings,
@@ -1055,6 +1070,7 @@ export async function performSync(
     localUpdatedAt: updatedAt,
     remoteUpdatedAt,
     updatedAt,
+    local: localInfo,
     remote: remoteInfo,
     assets,
     warnings: assets.warnings,

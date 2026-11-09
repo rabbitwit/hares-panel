@@ -6,7 +6,7 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 
 | 平台 | 导航数据 | 图片 / 图标 | 适合场景 |
 | --- | --- | --- | --- |
-| **Cloudflare Workers** | D1（推荐）或 KV | R2 | 已有 Cloudflare 账号，想要低延迟和免费额度 |
+| **Cloudflare Workers** | D1（推荐）或 KV | R2（推荐）或 KV | 已有 Cloudflare 账号，想要低延迟和免费额度 |
 | **Vercel** | Upstash Redis | Vercel Blob | 已在用 Vercel，希望从 Git 仓库自动部署 |
 | **EdgeOne Makers（国际版）** | EdgeOne Blob | EdgeOne Blob | 使用腾讯国际站，希望 Node Functions + Blob 一体化 |
 | **Docker 自托管** | 本地 `./data/state.json` | 本地 `./data/assets/` | 有 NAS / 云主机，想一条命令部署 |
@@ -68,10 +68,10 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 浏览器
   ├── 静态 SPA ──> Worker ASSETS（dist/）
   └── /api/*   ──> Worker ──> D1 或 KV（导航数据）
-                         └──> R2（图片）
+                         └──> R2（图片，未绑定则回退到 KV）
 ```
 
-**推荐组合：D1 + R2。** D1 适合频繁保存，R2 用来存图片；KV 也可以，但存在最终一致和单 key 写入频率限制。
+**推荐组合：D1 + R2。** D1 适合频繁保存，R2 用来存图片。也可以只用 **D1 + KV**：导航数据走 D1，图片写入 KV。纯 KV 也能工作，但存在最终一致和单 key 写入频率限制。
 
 ### 1. 登录 Cloudflare
 
@@ -98,7 +98,7 @@ npx wrangler d1 create hares-panel
 npx wrangler r2 bucket create hares-panel-assets
 ```
 
-R2 桶**不需要开启公共访问**：图片会通过 Worker 的 `/api/assets/:key` 读取。没有 R2 时导航文字仍可使用，但图片上传功能不可用。
+R2 桶**不需要开启公共访问**：图片会通过 Worker 的 `/api/assets/:key` 读取。没有 R2 但绑定了 KV 时，图片会写入 KV；若 R2 和 KV 都没有，导航文字仍可使用，但图片上传不可用。
 
 ### 4. 配置 `wrangler.jsonc`
 
@@ -134,7 +134,8 @@ R2 桶**不需要开启公共访问**：图片会通过 Worker 的 `/api/assets/
 - 也可以不用 CLI 创建：在 Cloudflare Dashboard 的 **Storage & Databases** 中创建 D1 / R2，再到 Worker → Settings → Bindings 添加同名绑定；效果与写 `wrangler.jsonc` 相同；
 - `binding` 名称不要随意改；
 - D1 表 `hares_panel_state` 不需要手动建表，首次读写时会自动创建；
-- 如果同时绑定 D1 和 KV，会优先使用 D1；
+- 如果同时绑定 D1 和 KV，导航数据优先使用 D1，未绑定 R2 时图片写入 KV；
+- 如果同时绑定 R2 和 KV，图片优先使用 R2；
 - 如果使用其他数据库名或桶名，只需同步修改这里的 `database_name` / `bucket_name`。
 
 ### 5. 设置管理员密钥
@@ -180,7 +181,7 @@ npx wrangler deploy
    }
    ```
 
-如果 `storage` 为 `null`，检查 D1/KV 绑定；如果 `assets` 为 `null`，检查 R2 绑定；如果 `auth` 为 `false`，检查 `ADMIN_PASSWORD` secret 是否已生效。
+如果 `storage` 为 `null`，检查 D1/KV 绑定；如果 `assets` 为 `null`，检查 R2 或 KV 绑定；如果 `auth` 为 `false`，检查 `ADMIN_PASSWORD` secret 是否已生效。
 
 ### 8. 自定义域名、日志与更新
 
@@ -222,7 +223,7 @@ npx wrangler kv namespace create hares_panel_kv
 ]
 ```
 
-然后照常设置 secret、构建和部署。KV 的导航状态保存在 `hares-panel:state:default`，适合访问量不大、修改不频繁的站点；频繁保存建议 D1。
+然后照常设置 secret、构建和部署。KV 的导航状态保存在 `hares-panel:state:default`，未绑定 R2 时图片保存在 `hares-panel:asset:*`。适合访问量不大、修改不频繁的站点；频繁保存建议 D1，大图或大量图片建议 R2。
 
 ---
 
@@ -988,7 +989,7 @@ npm ci
 
 **保存时提示无法连接服务端？** 前端会自动重试一次。若页面能打开但请求持续失败，通常是当前网络阻断了 `*.workers.dev` 或 EdgeOne 预览域名；请绑定自定义域名后访问，或改用 Vercel。也可以用手机热点验证是否为网络问题。EdgeOne 裸域名 401 属于预览域名访问控制，需要 Preview 链接。
 
-**图片上传失败？** 需要配置 R2（Workers）、Vercel Blob 或 EdgeOne Blob，并确保当前登录状态有效。Vercel 还需注意约 4.5 MB 的请求体限制；EdgeOne 单张图片上限为 5 MB，超大 SVG / GIF 建议改用图片 URL 或 Cloudflare R2。
+**图片上传失败？** Workers 需要 R2 或 KV，Vercel 需要 Blob，EdgeOne 需要 Blob，并确保当前登录状态有效。Vercel 还需注意约 4.5 MB 的请求体限制；EdgeOne 单张图片上限为 5 MB，超大 SVG / GIF 建议改用图片 URL 或 Cloudflare R2。
 
 **`npm run build` 在 Windows 上报 `esbuild ... Access is denied`？** 构建脚本 [scripts/build.mjs](../scripts/build.mjs) 已把 `TEMP/TMP/TMPDIR` 指向项目内的 `.build-tmp`，正常使用 `npm run build` 即可。不要直接运行 `vite build`；如果仍然失败，请检查杀毒软件或项目目录写权限。
 

@@ -84,7 +84,7 @@ export function CloudSettingsPanel() {
     <div className="space-y-5">
       <PanelHeader
         title="服务端与账号"
-        description="部署在 Cloudflare Workers、Vercel、EdgeOne Makers 或 Docker 时使用的服务端配置。导航数据保存在 KV / D1、Upstash Redis、EdgeOne Blob 或 Docker 本地文件，图片保存在 R2 / Vercel Blob / EdgeOne Blob 或 Docker 本地目录。"
+        description="部署在 Cloudflare Workers、Vercel、EdgeOne Makers 或 Docker 时使用的服务端配置。导航数据保存在 KV / D1、Upstash Redis、EdgeOne Blob 或 Docker 本地文件，图片保存在 R2 / KV / Vercel Blob / EdgeOne Blob 或 Docker 本地目录。"
       />
 
       <div

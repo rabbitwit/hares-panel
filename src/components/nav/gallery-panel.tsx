@@ -47,7 +47,7 @@ export function GalleryPanel({ embedded = false }: { embedded?: boolean }) {
   const upload = async (files: FileList | File[] | null) => {
     if (!files || (files as FileList).length === 0) return
     if (!cloudAssets) {
-      toast.error('服务端未配置对象存储（R2 / Vercel Blob / EdgeOne Blob / Docker 本地目录），无法上传图片')
+      toast.error('服务端未配置对象存储（R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地目录），无法上传图片')
       return
     }
     setUploading(true)
@@ -95,7 +95,7 @@ export function GalleryPanel({ embedded = false }: { embedded?: boolean }) {
     <div className={cn('flex flex-col gap-4', !embedded && 'min-h-0')}>
       {!cloudAssets && (
         <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[11px] leading-relaxed text-amber-700 dark:text-amber-200">
-          服务端尚未配置对象存储（R2 / Vercel Blob / EdgeOne Blob / Docker 本地目录），图库上传不可用。配置后重新部署即可启用。
+          服务端尚未配置对象存储（R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地目录），图库上传不可用。配置后重新部署即可启用。
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -284,7 +284,7 @@ export function GalleryPanel({ embedded = false }: { embedded?: boolean }) {
             </span>
             <span className="text-[11px]">
               {cloudAssets
-                ? '把图片拖到这里，压缩后会直接上传到 R2 / Vercel Blob / EdgeOne Blob / Docker 本地目录'
+                ? '把图片拖到这里，压缩后会直接上传到 R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地目录'
                 : '配置对象存储后即可上传图片'}
             </span>
           </button>
@@ -292,7 +292,7 @@ export function GalleryPanel({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <p className="text-[10px] leading-relaxed text-muted-foreground">
-        图片保存在服务端对象存储（R2 / Vercel Blob / EdgeOne Blob / Docker 本地目录），元数据随导航数据保存。删除正在使用的图片时，引用它的卡片或壁纸会自动回退。
+        图片保存在服务端对象存储（R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地目录），元数据随导航数据保存。删除正在使用的图片时，引用它的卡片或壁纸会自动回退。
       </p>
 
       <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(value) => !value && setPendingDelete(null)}>

@@ -46,7 +46,7 @@ export interface GalleryAsset {
   id: string
   name: string
   category: WallpaperCategory
-  /** Public URL in R2 / Vercel Blob / Docker file storage. Cloud storage is required in server mode. */
+  /** Public URL in R2 / KV / Vercel Blob / Docker file storage. Cloud storage is required in server mode. */
   dataUrl: string
   size: number
   createdAt: number

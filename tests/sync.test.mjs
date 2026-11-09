@@ -162,6 +162,10 @@ await test('auto sync uploads when local is newer', async () => {
   assert.equal(status, 200)
   assert.equal(body.ok, true)
   assert.equal(body.direction, 'upload')
+  assert.equal(body.remote.storage, 'kv')
+  assert.equal(body.remote.assets, 'r2')
+  assert.equal(body.local.storage, 'kv')
+  assert.equal(body.local.assets, 'r2')
   // The remote already holds the same asset id, so it is re-used, not re-uploaded.
   assert.equal(body.assets.existing, 1)
 })
@@ -246,6 +250,25 @@ await test('sync requires a remote URL and password', async () => {
   const { status, body } = await runSync(local, remote, { password: 'test-password' })
   assert.equal(status, 400)
   assert.equal(body.error, 'remote_url_required')
+})
+
+await test('sync result reports KV as remote image storage', async () => {
+  const kvAssets = memoryAssets()
+  kvAssets.kind = 'kv'
+  const local = localConfig({ data: sampleData, updatedAt: 2_000_000_000_000 })
+  const remote = makeConfig({
+    state: memoryState({ data: sampleData, updatedAt: 1_000_000_000_000 }),
+    assets: kvAssets,
+  })
+  const { status, body } = await runSync(local, remote, {
+    remoteUrl: 'https://remote.test',
+    password: 'test-password',
+    mode: 'upload',
+  })
+  assert.equal(status, 200)
+  assert.equal(body.remote.storage, 'kv')
+  assert.equal(body.remote.assets, 'kv')
+  assert.equal(body.local.assets, 'r2')
 })
 
 console.log(`\n${passed} passed, ${failed} failed`)

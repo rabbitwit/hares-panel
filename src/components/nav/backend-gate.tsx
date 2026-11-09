@@ -91,7 +91,7 @@ export function BackendRequired() {
         </li>
         <li className="flex gap-2">
           <span className="text-white/30">02</span>
-          配置 KV / D1（Vercel 为 Upstash Redis，EdgeOne 使用 Blob，Docker 使用本地文件），图片需要 R2 / Vercel Blob / EdgeOne Blob / 本地目录。
+          配置 KV / D1（Vercel 为 Upstash Redis，EdgeOne 使用 Blob，Docker 使用本地文件）；图片可用 R2 或 KV、Vercel Blob、EdgeOne Blob 或本地目录。
         </li>
         <li className="flex gap-2">
           <span className="text-white/30">03</span>

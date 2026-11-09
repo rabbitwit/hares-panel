@@ -93,7 +93,7 @@ export async function filesToGalleryAssets(
 ): Promise<Omit<GalleryAsset, 'id' | 'createdAt'>[]> {
   const cloud = useCloudStore.getState()
   if (cloud.status !== 'connected' || !cloud.info?.assets || !cloud.token) {
-    throw new Error('图库需要已连接的服务端与对象存储（R2 / Vercel Blob / EdgeOne Blob / Docker 本地目录）')
+    throw new Error('图库需要已连接的服务端与对象存储（R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地目录）')
   }
   const token = cloud.token
   const assets: Omit<GalleryAsset, 'id' | 'createdAt'>[] = []

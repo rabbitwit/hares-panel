@@ -27,7 +27,7 @@ Hares-Panel 是一个面向 NAS、家庭服务器和云主机的导航首页。�
 | 图标库 | 178 个离线内置图标、Iconify 在线搜索、图片 URL、上传、服务端图库、删除对象、图标颜色 |
 | 自动图标 | 优先读取目标网站自身 favicon；失败时使用 [favicon-api](https://github.com/xinac721/favicon-api) |
 | 服务端存储 | 导航数据保存到 Cloudflare KV / D1、Vercel Upstash Redis、EdgeOne Blob 或 Docker 本地文件；启动即从 API 读取 |
-| 对象存储 | 图片与图标保存到 Cloudflare R2、Vercel Blob、EdgeOne Blob 或 Docker 本地 `assets/`，数据库只存 URL 与对象 key |
+| 对象存储 | 图片与图标保存到 Cloudflare R2（或未绑 R2 时回退到 KV）、Vercel Blob、EdgeOne Blob 或 Docker 本地 `assets/`，数据库只存 URL 与对象 key |
 | 自托管 | Docker 一键部署，直连高位端口（默认 18000）；状态与图片持久化到 `./data` |
 | 版本更新 | 「关于」页自动检查 Docker Hub 镜像与 GitHub 源码版本，发现新版本时显示提示和升级入口 |
 | 管理员认证 | 密码来自环境变量 `ADMIN_PASSWORD`；HMAC 签名令牌，7 天滑动有效期（访问自动续期） |
@@ -50,7 +50,7 @@ Hares-Panel 是一个面向 NAS、家庭服务器和云主机的导航首页。�
 ## 架构
 
 ```
-浏览器 SPA ──/api/*──> Cloudflare Worker（KV/D1 + R2）
+浏览器 SPA ──/api/*──> Cloudflare Worker（KV/D1 + R2，无 R2 时图片回退 KV）
                         或 Vercel Function（Upstash + Blob）
                         或 EdgeOne Makers Node Function（Blob）
                         或 Docker 容器 / 飞牛原生应用（Node 文件存储）
@@ -146,7 +146,7 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 
 | 平台 | 导航数据 | 图片 / 图标 | 适合场景 |
 | --- | --- | --- | --- |
-| **Cloudflare Workers** | D1（推荐）或 KV | R2 | 已有 Cloudflare 账号，想要低延迟和免费额度 |
+| **Cloudflare Workers** | D1（推荐）或 KV | R2（推荐）或 KV | 已有 Cloudflare 账号，想要低延迟和免费额度 |
 | **Vercel** | Upstash Redis | Vercel Blob | 已在用 Vercel，希望从 Git 仓库自动部署 |
 | **EdgeOne Makers（国际版）** | EdgeOne Blob | EdgeOne Blob | 使用腾讯国际站，希望 Node Functions + Blob 一体化 |
 | **Docker 自托管** | 本地 `./data/state.json` | 本地 `./data/assets/` | 有 NAS / 云主机，想一条命令部署；公网可配合现有反代 |
@@ -163,7 +163,7 @@ Hares-Panel 由 **静态前端 + 同源 `/api`** 两部分组成，前端和 API
 
 其中包含：
 
-- [Cloudflare Workers](docs/DEPLOYMENT.md#cloudflare-workers)（D1 + R2，或只用 KV）
+- [Cloudflare Workers](docs/DEPLOYMENT.md#cloudflare-workers)（D1 + R2，或 D1 + KV / 只用 KV）
 - [Vercel](docs/DEPLOYMENT.md#vercelupstash-redis--vercel-blob)（Upstash Redis + Vercel Blob；网页导入后必须先连存储再 Redeploy）
 - [EdgeOne Makers](docs/DEPLOYMENT.md#edgeone-makers腾讯国际版)（Node Functions + Blob，国际版）
 - [Docker 自托管](docs/DEPLOYMENT.md#docker-自托管)（NAS / 云主机）
@@ -218,7 +218,7 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 
 默认演示数据约 10 KB；Cloud 平台应用内上限 8 MB（Docker 默认 16 MB，可通过 `HARES_STATE_MAX_MB` 调整），但实际请求还受平台限制（Vercel 约 4.5 MB、EdgeOne 5 MB）。每次修改覆盖整份文档，`updatedAt` 由服务端生成。
 
-图片上传后进入 R2 / Vercel Blob / EdgeOne Blob / Docker 本地 `data/assets/`：
+图片上传后进入 R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地 `data/assets/`：
 
 ```json
 {
@@ -244,7 +244,7 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 | `PUT` | `/api/state` | Bearer | 覆盖保存，Cloud 平台默认上限 8 MB（Docker 默认 16 MB） |
 | `POST` | `/api/assets` | Bearer | `multipart/form-data` 上传图片 |
 | `GET` | `/api/assets/:key` | 否 | Worker / R2 / EdgeOne / Docker 回源图片；Vercel Blob 由 CDN 提供 |
-| `DELETE` | `/api/assets/:key` | Bearer | 删除 R2 / Vercel Blob / EdgeOne Blob / Docker 本地对象 |
+| `DELETE` | `/api/assets/:key` | Bearer | 删除 R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地对象 |
 
 ## 安全说明
 
@@ -267,7 +267,7 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 - **Vercel 请求体上限约 4.5 MB**：前端会先压缩图片；超大原图请改用 Cloudflare R2 或 Docker 自托管。
 - **EdgeOne 请求体上限约 6 MB**：单张图片上限 5 MB；免费版 Blob 容量 1 GB，状态与图片共用。
 - **平台数据默认不互通**：Cloudflare、Vercel、EdgeOne、Docker 的状态和图片存储互相独立，不会自动同步；需要保持数据一致时，请在「管理控制台 → 实例同步」手动发起双向同步。
-- **KV 写入限制**：同一 key 约 1 次/秒且最终一致，频繁编辑建议使用 D1。
+- **KV 写入限制**：同一 key 约 1 次/秒且最终一致，频繁编辑建议使用 D1。未绑定 R2 时图片也会写入 KV，单值上限 25 MB。
 - **依赖安全公告**：`npm audit` 会报告 Vite / Wrangler 等构建工具与 Vercel Blob SDK 的传递依赖公告；前端静态产物不受影响。
 
 ## 升级与版本检查

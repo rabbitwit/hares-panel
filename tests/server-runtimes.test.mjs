@@ -210,13 +210,37 @@ const worker = (await import(pathToFileURL(workerOut).href + `?t=${Date.now()}`)
 
 function kvMock() {
   const store = new Map()
+  const meta = new Map()
+  const toArrayBuffer = (value) => {
+    if (value instanceof ArrayBuffer) return value
+    if (ArrayBuffer.isView(value)) {
+      return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)
+    }
+    return new TextEncoder().encode(String(value)).buffer
+  }
   return {
     store,
-    async get(key) {
-      return store.get(key) ?? null
+    async get(key, options) {
+      if (!store.has(key)) return null
+      const value = store.get(key)
+      if (options?.type === 'arrayBuffer') return toArrayBuffer(value)
+      return typeof value === 'string' ? value : new TextDecoder().decode(toArrayBuffer(value))
     },
-    async put(key, value) {
+    async put(key, value, options) {
       store.set(key, value)
+      meta.set(key, options?.metadata ?? null)
+    },
+    async delete(key) {
+      store.delete(key)
+      meta.delete(key)
+    },
+    async getWithMetadata(key, options) {
+      if (!store.has(key)) return { value: null, metadata: null }
+      const value = store.get(key)
+      return {
+        value: options?.type === 'arrayBuffer' ? toArrayBuffer(value) : value,
+        metadata: meta.get(key) ?? null,
+      }
     },
   }
 }
@@ -360,6 +384,7 @@ await test('D1 is preferred over KV when both are bound', async () => {
   }
   const health = await (await callWorker(env, '/api/health')).json()
   assert.equal(health.storage, 'd1')
+  assert.equal(health.assets, 'kv')
   assert.equal(health.ok, true)
 
   const session = await (
@@ -378,6 +403,94 @@ await test('D1 is preferred over KV when both are bound', async () => {
   assert.ok(d1.getRow())
   const publicBody = await (await callWorker(env, '/api/state')).json()
   assert.equal(publicBody.data.config.siteName, 'Runtime Test')
+})
+
+await test('D1 + KV without R2 stores images in KV', async () => {
+  const kv = kvMock()
+  const env = {
+    ASSETS: assetsMock(),
+    hares_panel: d1Mock(),
+    hares_panel_kv: kv,
+    ADMIN_PASSWORD: 'worker-pass',
+    SESSION_SECRET: 'worker-secret',
+  }
+  const health = await (await callWorker(env, '/api/health')).json()
+  assert.equal(health.ok, true)
+  assert.equal(health.storage, 'd1')
+  assert.equal(health.assets, 'kv')
+
+  const session = await (
+    await callWorker(env, '/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'worker-pass' }),
+    })
+  ).json()
+
+  const form = new FormData()
+  form.append('file', new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'image/png' }), 'a.png')
+  const upload = await callWorker(env, '/api/assets', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${session.token}` },
+    body: form,
+  })
+  const asset = await upload.json()
+  assert.equal(upload.status, 201)
+  assert.ok([...kv.store.keys()].some((key) => String(key).includes(asset.key)))
+
+  const served = await callWorker(env, asset.url)
+  assert.equal(served.status, 200)
+  assert.equal(served.headers.get('content-type'), 'image/png')
+  assert.deepEqual(new Uint8Array(await served.arrayBuffer()), new Uint8Array([1, 2, 3, 4]))
+
+  const del = await callWorker(env, `/api/assets/${encodeURIComponent(asset.key)}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${session.token}` },
+  })
+  assert.equal(del.status, 200)
+  assert.equal((await callWorker(env, asset.url)).status, 404)
+})
+
+await test('KV without R2 stores both state and assets', async () => {
+  const kv = kvMock()
+  const env = {
+    ASSETS: assetsMock(),
+    hares_panel_kv: kv,
+    ADMIN_PASSWORD: 'worker-pass',
+    SESSION_SECRET: 'worker-secret',
+  }
+  const health = await (await callWorker(env, '/api/health')).json()
+  assert.equal(health.storage, 'kv')
+  assert.equal(health.assets, 'kv')
+
+  const session = await (
+    await callWorker(env, '/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ password: 'worker-pass' }),
+    })
+  ).json()
+
+  const put = await callWorker(env, '/api/state', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${session.token}` },
+    body: JSON.stringify({ data: sample }),
+  })
+  assert.equal(put.status, 200)
+  assert.ok(kv.store.has('hares-panel:state:default'))
+
+  const form = new FormData()
+  form.append('file', new Blob([new Uint8Array([5, 6])], { type: 'image/webp' }), 'b.webp')
+  const upload = await callWorker(env, '/api/assets', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${session.token}` },
+    body: form,
+  })
+  const asset = await upload.json()
+  assert.equal(upload.status, 201)
+  const served = await callWorker(env, asset.url)
+  assert.equal(served.status, 200)
+  assert.deepEqual(new Uint8Array(await served.arrayBuffer()), new Uint8Array([5, 6]))
 })
 
 await test('dashboard-style binding aliases are detected', async () => {

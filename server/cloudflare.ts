@@ -3,7 +3,20 @@ import type { ApiConfig, AssetStore, StateStore, SyncMeta } from './core'
 /** Minimal structural types so the Worker bundle stays free of runtime packages. */
 export interface KVNamespaceLike {
   get(key: string): Promise<string | null>
-  put(key: string, value: string): Promise<void>
+  get(key: string, options: { type: 'arrayBuffer' }): Promise<ArrayBuffer | null>
+  put(
+    key: string,
+    value: string | ArrayBuffer | ArrayBufferView,
+    options?: { metadata?: Record<string, string> },
+  ): Promise<void>
+  delete(key: string): Promise<void>
+  getWithMetadata(
+    key: string,
+    options: { type: 'arrayBuffer' },
+  ): Promise<{
+    value: ArrayBuffer | null
+    metadata: { contentType?: string } | null
+  }>
 }
 
 interface D1Result<T> {
@@ -213,12 +226,35 @@ function r2AssetStore(bucket: R2BucketLike): AssetStore {
   }
 }
 
+const ASSET_KEY_PREFIX = 'hares-panel:asset:'
+
+function kvAssetStore(kv: KVNamespaceLike): AssetStore {
+  return {
+    kind: 'kv',
+    async putAsset(key, bytes, contentType) {
+      await kv.put(`${ASSET_KEY_PREFIX}${key}`, bytes, { metadata: { contentType } })
+      return { key, url: `/api/assets/${encodeURIComponent(key)}` }
+    },
+    async getAsset(key) {
+      const stored = await kv.getWithMetadata(`${ASSET_KEY_PREFIX}${key}`, { type: 'arrayBuffer' })
+      if (!stored.value) return null
+      return {
+        bytes: new Uint8Array(stored.value),
+        contentType: stored.metadata?.contentType || 'application/octet-stream',
+      }
+    },
+    async deleteAsset(key) {
+      await kv.delete(`${ASSET_KEY_PREFIX}${key}`)
+    },
+  }
+}
+
 export function createApiConfig(env: EnvLike): ApiConfig {
   const db = env.hares_panel ?? env.HARES_DB
   const kv = env.hares_panel_kv ?? env.HARES_KV
   const bucket = env.hares_panel_assets ?? env.HARES_BUCKET
   const state = db ? d1StateStore(db) : kv ? kvStateStore(kv) : null
-  const assets = bucket ? r2AssetStore(bucket) : null
+  const assets = bucket ? r2AssetStore(bucket) : kv ? kvAssetStore(kv) : null
   return {
     adminPassword: env.ADMIN_PASSWORD?.trim() ?? '',
     sessionSecret: env.SESSION_SECRET?.trim() || undefined,

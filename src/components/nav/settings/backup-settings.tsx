@@ -109,7 +109,7 @@ export function BackupSettingsPanel() {
       {!cloudAssets && (
         <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-[11px] leading-relaxed text-amber-700 dark:text-amber-200">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-          当前服务端未配置对象存储（R2 / Vercel Blob / EdgeOne Blob / Docker 本地目录），图库上传不可用。请先配置存储后重新部署。
+          当前服务端未配置对象存储（R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地目录），图库上传不可用。请先配置存储后重新部署。
         </div>
       )}
 
@@ -221,7 +221,7 @@ export function BackupSettingsPanel() {
             </span>
           </div>
           <p className="text-[10px] leading-relaxed text-muted-foreground">
-            清除浏览器数据或更换设备不会影响服务端数据；重新登录即可读取。R2 / Vercel Blob / EdgeOne Blob / Docker `data/assets` 中的图片不会包含在 JSON 备份中。
+            清除浏览器数据或更换设备不会影响服务端数据；重新登录即可读取。R2 / KV / Vercel Blob / EdgeOne Blob / Docker `data/assets` 中的图片不会包含在 JSON 备份中。
           </p>
         </div>
       </SettingsSection>
