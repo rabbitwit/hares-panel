@@ -142,7 +142,7 @@ export function AboutSettingsPanel() {
           <img
             src={`${import.meta.env.BASE_URL}logo-mark.svg`}
             alt="Hares-Panel"
-            className="h-16 w-16 rounded-[20px] drop-shadow-xl"
+            className="h-16 w-16 rounded-[20px] drop-shadow-[0_8px_16px_rgba(79,70,229,.28)]"
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">

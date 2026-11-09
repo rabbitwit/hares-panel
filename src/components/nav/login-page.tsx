@@ -121,7 +121,7 @@ export function LoginPage() {
               <img
                 src={logo || `${import.meta.env.BASE_URL}logo-mark.svg`}
                 alt=""
-                className="h-16 w-16 rounded-[20px] object-cover drop-shadow-[0_16px_30px_rgba(0,0,0,.35)]"
+                className="h-16 w-16 rounded-[20px] object-cover drop-shadow-[0_8px_16px_rgba(79,70,229,.28)]"
               />
               <h1
                 className={cn(

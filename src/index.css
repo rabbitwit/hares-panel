@@ -680,7 +680,7 @@
 }
 
 .boot-splash img {
-  filter: drop-shadow(0 20px 34px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 8px 16px rgba(79, 70, 229, 0.28));
 }
 
 .boot-name {

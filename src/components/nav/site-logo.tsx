@@ -37,7 +37,7 @@ export function SiteLogo({
             <img
               src={`${import.meta.env.BASE_URL}logo-mark.svg`}
               alt=""
-              className={cn('h-11 w-11 rounded-2xl drop-shadow-xl', markClassName)}
+              className={cn('h-11 w-11 rounded-1xl drop-shadow-[0_6px_12px_rgba(79,70,229,.28)]', markClassName)}
               draggable={false}
             />
           )}
