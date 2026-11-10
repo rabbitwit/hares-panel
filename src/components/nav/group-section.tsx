@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
@@ -82,6 +82,36 @@ function SortableItem({
   )
 }
 
+const ICON_TRACK_PX = 88
+
+function useIconGridFillsRow(tileCount: number, enabled: boolean) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const [fillsRow, setFillsRow] = useState(false)
+
+  useLayoutEffect(() => {
+    if (!enabled) {
+      setFillsRow(false)
+      return
+    }
+
+    const el = ref.current
+    if (!el) return
+
+    const update = () => {
+      const width = el.getBoundingClientRect().width
+      const columns = Math.floor(width / ICON_TRACK_PX)
+      setFillsRow(columns > 1 && tileCount >= columns)
+    }
+
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [enabled, tileCount])
+
+  return { ref, fillsRow }
+}
+
 function AddItemTile({ style, onClick }: { style: CardStyle; onClick: () => void }) {
   if (style !== 'icon') {
     return (
@@ -144,6 +174,12 @@ export function GroupSection({
     disabled: !editMode || !isAdmin || collapsed,
   })
 
+  const tileCount = items.length + (isAdmin && editMode ? 1 : 0)
+  const { ref: iconGridRef, fillsRow } = useIconGridFillsRow(
+    tileCount,
+    style === 'icon' && !collapsed && !(group.hidden && !isAdmin),
+  )
+
   if (group.hidden && !isAdmin) return null
 
   const toggleCollapsed = () => {
@@ -156,21 +192,26 @@ export function GroupSection({
 
   const gridClass =
     style === 'icon'
-      ? // Icon rows span the full content width: the first tile's left edge sits
-        // on the content's left edge and the last tile's right edge on its right
+      ? // Icon rows span the full content width only when there are enough
+        // tiles to fill a row: the first tile's left edge sits on the
+        // content's left edge and the last tile's right edge on its right
         // edge.
         //
-        // `auto-fit` drops the columns that have no item, so the container's
-        // leftover width is free space rather than empty trailing tracks, and
-        // `justify-between` spends that space on the gutters. A plain
-        // `auto-fill` column list instead keeps the unused tracks, which is why
-        // the row ended early with a dead strip on the right.
+        // `auto-fit` drops columns that have no item, so leftover width is
+        // free space rather than empty trailing tracks. `justify-between`
+        // then spends that space on the gutters — but only if the group
+        // actually fills a row. A short group (fewer tiles than columns)
+        // keeps `justify-start` so a handful of icons stay compact on the
+        // left instead of being stretched across the whole row.
         //
-        // A track is 88px while the tile is 64px, so the tile is centred with
-        // 12px of slack per side; `-mx-3` grows the grid by exactly that slack
-        // at both ends, which puts the outermost tiles flush with the group
-        // heading instead of 12px inside it.
-        'grid grid-cols-[repeat(auto-fit,88px)] justify-between -mx-3 gap-y-4 sm:gap-y-5'
+        // A track is 88px while the tile is 64px, so the tile is centred
+        // with 12px of slack per side; `-mx-3` grows the grid by exactly
+        // that slack at both ends, which puts the outermost tiles flush
+        // with the group heading instead of 12px inside it.
+        cn(
+          'grid grid-cols-[repeat(auto-fit,88px)] -mx-3 gap-y-4 sm:gap-y-5',
+          fillsRow ? 'justify-between' : 'justify-start',
+        )
       : style === 'card'
         ? 'grid grid-cols-1 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(250px,1fr))]'
         : style === 'solid'
@@ -293,7 +334,7 @@ export function GroupSection({
 
       {!collapsed && (
         <SortableContext items={items.map((item) => item.id)} strategy={rectSortingStrategy}>
-          <div id={contentId} className={gridClass}>
+          <div id={contentId} ref={iconGridRef} className={gridClass}>
             {items.map((item) => (
               <SortableItem
                 key={item.id}

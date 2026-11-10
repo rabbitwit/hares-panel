@@ -374,7 +374,7 @@ export function IconPicker({
               className="mt-3 flex flex-col items-center gap-3 rounded-2xl border border-white/20 p-5 shadow-inner"
               style={{ background: `linear-gradient(135deg, ${colorWithAlpha(previewAccent, 0.96)}, ${colorWithAlpha(previewAccent, 0.76)})`, color: readableTextColor(previewAccent) }}
             >
-              <div className="flex h-16 w-16 items-center justify-center rounded-[18px] border border-white/25 bg-white/15">
+              <div className="flex h-16 w-16 items-center justify-center rounded-[18px] bg-white/15">
                 <NavIcon icon={draft} iconColor={draftColor} title={title || '图标'} size={34} silhouette />
               </div>
               <div className="max-w-full truncate text-xs opacity-95">{title || '卡片标题'}</div>

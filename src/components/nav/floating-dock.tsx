@@ -37,7 +37,8 @@ function DockButton({
           aria-label={label}
           className={cn(
             'relative flex h-9 w-9 items-center justify-center rounded-xl text-foreground/55 transition-all hover:bg-foreground/12 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30',
-            active && 'bg-violet-500/20 text-violet-200 hover:bg-violet-500/25 hover:text-violet-100',
+            active &&
+              'bg-violet-500/15 text-violet-700 hover:bg-violet-500/25 hover:text-violet-800 dark:bg-violet-500/20 dark:text-violet-200 dark:hover:bg-violet-500/25 dark:hover:text-violet-100',
           )}
         >
           {children}

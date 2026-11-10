@@ -184,8 +184,8 @@ export function ItemCard({
         'relative flex shrink-0 items-center justify-center transition-all duration-300',
         style === 'icon' && 'nav-icon-tile h-16 w-16 shrink-0 overflow-hidden rounded-[var(--card-radius,16px)] group-hover/card:scale-105 group-hover/card:shadow-glow',
         style === 'solid' &&
-          'h-10 w-10 rounded-xl border border-white/25 bg-white/15 group-hover/card:bg-white/20',
-        style === 'card' && 'h-11 w-11 rounded-[13px] border border-foreground/10 bg-foreground/8',
+          'h-10 w-10 rounded-xl bg-white/15 group-hover/card:bg-white/20',
+        style === 'card' && 'h-11 w-11 rounded-[13px] bg-foreground/8',
         style === 'transparent' && 'h-9 w-9 rounded-xl',
         glassEffect && style === 'icon' && 'nav-glass-tile is-glass',
       )}

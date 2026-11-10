@@ -46,7 +46,7 @@ function StylePreview({ style }: { style: CardStyle }) {
                 : 'bg-gradient-to-br from-sky-500/70 to-indigo-500/55',
             )}
           >
-            <span className="h-4 w-4 rounded-[5px] border border-white/25 bg-white/20" />
+            <span className="h-4 w-4 rounded-[5px] bg-white/20" />
             <span className="block h-1 w-10 rounded-full bg-white/60" />
           </div>
         ))}
@@ -63,7 +63,7 @@ function StylePreview({ style }: { style: CardStyle }) {
             style === 'card' ? 'border border-white/10 bg-white/8' : 'border border-transparent',
           )}
         >
-          <span className="h-4 w-4 rounded-[5px] border border-white/10 bg-white/10" />
+          <span className="h-4 w-4 rounded-[5px] bg-white/10" />
           <span className="space-y-0.5">
             <span className="block h-1 w-10 rounded-full bg-white/40" />
             <span className="block h-0.5 w-7 rounded-full bg-white/20" />
