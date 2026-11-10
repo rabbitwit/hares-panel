@@ -82,7 +82,7 @@ function SortableItem({
   )
 }
 
-const ICON_TRACK_PX = 88
+const ICON_TRACK_PX = 104
 
 function useIconGridFillsRow(tileCount: number, enabled: boolean) {
   const ref = useRef<HTMLDivElement | null>(null)
@@ -204,12 +204,12 @@ export function GroupSection({
         // keeps `justify-start` so a handful of icons stay compact on the
         // left instead of being stretched across the whole row.
         //
-        // A track is 88px while the tile is 64px, so the tile is centred
-        // with 12px of slack per side; `-mx-3` grows the grid by exactly
+        // A track is 104px while the tile is 64px, so the tile is centred
+        // with 20px of slack per side; `-mx-5` grows the grid by exactly
         // that slack at both ends, which puts the outermost tiles flush
-        // with the group heading instead of 12px inside it.
+        // with the group heading instead of 20px inside it.
         cn(
-          'grid grid-cols-[repeat(auto-fit,88px)] -mx-3 gap-y-4 sm:gap-y-5',
+          'grid grid-cols-[repeat(auto-fit,104px)] -mx-5 gap-y-5 sm:gap-y-6',
           fillsRow ? 'justify-between' : 'justify-start',
         )
       : style === 'card'
