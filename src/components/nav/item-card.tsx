@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import {
   Copy,
   ExternalLink,
@@ -34,6 +34,61 @@ import { brandColorForIcon, brandColorForUrl } from '@/lib/brand-color'
 import { cn, colorWithAlpha, colorFromString, getDomain, copyText, readableTextColor } from '@/lib/utils'
 import type { CardStyle, NavGroup, NavItem } from '@/types'
 
+function useOpenOnLongPress(onOpen: () => void) {
+  const timerRef = useRef(0)
+  const suppressClickRef = useRef(false)
+  const startRef = useRef({ x: 0, y: 0 })
+
+  const clearTimer = useCallback(() => {
+    if (!timerRef.current) return
+    window.clearTimeout(timerRef.current)
+    timerRef.current = 0
+  }, [])
+
+  useEffect(() => () => clearTimer(), [clearTimer])
+
+  const onPointerDown = useCallback(
+    (event: ReactPointerEvent) => {
+      if (event.pointerType === 'mouse') return
+      suppressClickRef.current = false
+      startRef.current = { x: event.clientX, y: event.clientY }
+      clearTimer()
+      timerRef.current = window.setTimeout(() => {
+        timerRef.current = 0
+        suppressClickRef.current = true
+        onOpen()
+      }, 520)
+    },
+    [clearTimer, onOpen],
+  )
+
+  const onPointerMove = useCallback(
+    (event: ReactPointerEvent) => {
+      if (!timerRef.current) return
+      const dx = event.clientX - startRef.current.x
+      const dy = event.clientY - startRef.current.y
+      if (dx * dx + dy * dy > 64) clearTimer()
+    },
+    [clearTimer],
+  )
+
+  const didLongPress = useCallback(() => {
+    if (!suppressClickRef.current) return false
+    suppressClickRef.current = false
+    return true
+  }, [])
+
+  return {
+    didLongPress,
+    pointerHandlers: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: clearTimer,
+      onPointerCancel: clearTimer,
+    },
+  }
+}
+
 interface ItemCardProps {
   item: NavItem
   group?: NavGroup
@@ -66,6 +121,8 @@ export function ItemCard({
   const glassEffect = useAppStore((state) => state.config.glassEffect)
   const effectiveUrl = resolveItemUrl(item, networkMode)
   const [menuOpen, setMenuOpen] = useState(false)
+  const openMenu = useCallback(() => setMenuOpen(true), [])
+  const { didLongPress, pointerHandlers } = useOpenOnLongPress(openMenu)
 
   useEffect(() => {
     if (!menuOpen) return
@@ -76,13 +133,16 @@ export function ItemCard({
     return () => window.removeEventListener('scroll', close, true)
   }, [menuOpen])
 
+  const isEditing = editMode && isAdmin
+  const openInNewTab = item.openMode !== 'self'
+
   const handleActivate = useCallback(() => {
-    if (editMode && isAdmin) {
+    if (isEditing) {
       openEditItem(item.id)
       return
     }
     openItem(item)
-  }, [editMode, isAdmin, item, openEditItem, openItem])
+  }, [isEditing, item, openEditItem, openItem])
 
   const copyLink = async () => {
     const url = effectiveUrl || item.url || item.lanUrl
@@ -183,57 +243,42 @@ export function ItemCard({
     </span>
   )
 
-  const cardBody = (
-    <div
-      role="link"
-      tabIndex={0}
-      aria-label={item.title}
-      onClick={handleActivate}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault()
-          handleActivate()
+  const cardClassName = cn(
+    'group/card relative outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-foreground/40',
+    'select-none text-inherit no-underline',
+    style === 'icon' && 'flex cursor-pointer flex-col items-center gap-2 rounded-xl py-0.5',
+    style === 'solid' &&
+      'flex h-[78px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] border border-white/20 px-3.5 hover:-translate-y-0.5 hover:brightness-105',
+    style === 'card' &&
+      cn(
+        'nav-item-surface flex h-[78px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] px-3.5 hover:-translate-y-0.5',
+        glassEffect
+          ? 'nav-card-glass is-card-glass'
+          : 'hover:bg-foreground/12 hover:shadow-nav',
+      ),
+    style === 'transparent' &&
+      cn(
+        'flex h-[64px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] border px-2.5',
+        glassEffect
+          ? 'nav-card-glass is-card-glass-on-hover'
+          : 'border-transparent hover:border-foreground/10 hover:bg-foreground/7',
+      ),
+    editMode && 'ring-1 ring-foreground/10 ring-offset-0 hover:ring-foreground/25',
+    item.hidden && !isAdmin && 'hidden',
+    className,
+  )
+  const cardStyle: CSSProperties | undefined =
+    style === 'solid'
+      ? {
+          color: solidForeground,
+          background: `linear-gradient(135deg, ${colorWithAlpha(accent, 0.96)}, ${colorWithAlpha(accent, 0.76)})`,
+          boxShadow: `0 18px 38px -26px ${colorWithAlpha(accent, 0.9)}`,
+          WebkitTouchCallout: 'none',
         }
-      }}
-      onAuxClick={(event) => {
-        if (event.button === 1) {
-          event.preventDefault()
-          openItem(item, { mode: 'new' })
-        }
-      }}
-      className={cn(
-        'group/card relative outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-foreground/40',
-        style === 'icon' && 'flex cursor-pointer flex-col items-center gap-2 rounded-xl py-0.5',
-        style === 'solid' &&
-          'flex h-[78px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] border border-white/20 px-3.5 hover:-translate-y-0.5 hover:brightness-105',
-        style === 'card' &&
-          cn(
-            'nav-item-surface flex h-[78px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] px-3.5 hover:-translate-y-0.5',
-            glassEffect
-              ? 'nav-card-glass is-card-glass'
-              : 'hover:bg-foreground/12 hover:shadow-nav',
-          ),
-        style === 'transparent' &&
-          cn(
-            'flex h-[64px] cursor-pointer items-center gap-3 rounded-[var(--card-radius,16px)] border px-2.5',
-            glassEffect
-              ? 'nav-card-glass is-card-glass-on-hover'
-              : 'border-transparent hover:border-foreground/10 hover:bg-foreground/7',
-          ),
-        editMode && 'ring-1 ring-foreground/10 ring-offset-0 hover:ring-foreground/25',
-        item.hidden && !isAdmin && 'hidden',
-        className,
-      )}
-      style={
-        style === 'solid'
-          ? {
-              color: solidForeground,
-              background: `linear-gradient(135deg, ${colorWithAlpha(accent, 0.96)}, ${colorWithAlpha(accent, 0.76)})`,
-              boxShadow: `0 18px 38px -26px ${colorWithAlpha(accent, 0.9)}`,
-            }
-          : undefined
-      }
-    >
+      : { WebkitTouchCallout: 'none' }
+
+  const cardInner = (
+    <>
       {iconTile}
       {titleAndDescription}
 
@@ -254,7 +299,7 @@ export function ItemCard({
         </span>
       )}
 
-      {editMode && isAdmin && (
+      {isEditing && (
         <>
           <button
             type="button"
@@ -278,7 +323,56 @@ export function ItemCard({
           </button>
         </>
       )}
+    </>
+  )
+
+  // Real <a href> so mobile Chrome treats this as a new browser tab instead of
+  // a VIEW intent that silently launches an installed app. Edit mode stays a
+  // div so drag/edit buttons are not nested inside a link.
+  const cardBody = isEditing ? (
+    <div
+      role="link"
+      tabIndex={0}
+      aria-label={item.title}
+      onClick={() => {
+        if (didLongPress()) return
+        handleActivate()
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          handleActivate()
+        }
+      }}
+      className={cardClassName}
+      style={cardStyle}
+      {...pointerHandlers}
+    >
+      {cardInner}
     </div>
+  ) : (
+    <a
+      href={effectiveUrl || undefined}
+      target={effectiveUrl && openInNewTab ? '_blank' : undefined}
+      rel={effectiveUrl && openInNewTab ? 'noopener noreferrer' : undefined}
+      draggable={false}
+      aria-label={item.title}
+      onClick={(event) => {
+        if (didLongPress()) {
+          event.preventDefault()
+          return
+        }
+        if (!effectiveUrl) {
+          event.preventDefault()
+          toast.error('这个卡片还没有配置地址')
+        }
+      }}
+      className={cardClassName}
+      style={cardStyle}
+      {...pointerHandlers}
+    >
+      {cardInner}
+    </a>
   )
 
   if (presentation) {
