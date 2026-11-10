@@ -281,13 +281,30 @@ function safeAssetKey(key) {
   }
   return /^[a-zA-Z0-9._/-]+$/.test(key) ? key : null;
 }
+function folderFromCategory(category) {
+  switch (category?.trim().toLowerCase()) {
+    case "wallpaper":
+    case "wallpapers":
+      return "wallpapers";
+    case "avatar":
+    case "avatars":
+      return "avatars";
+    case "icon":
+    case "icons":
+      return "icons";
+    default:
+      return "";
+  }
+}
 function pickAssetKey(asset, contentType, used) {
   const extension = contentTypeExtension(contentType) ?? "png";
   let key = readString(asset.remoteKey);
   if (!key && asset.dataUrl) {
     try {
       const pathname = new URL(asset.dataUrl, "https://placeholder.local/").pathname;
-      key = decodeURIComponent(pathname.split("/").pop() ?? "");
+      const marker = "/api/assets/";
+      const index = pathname.indexOf(marker);
+      key = index >= 0 ? decodeURIComponent(pathname.slice(index + marker.length)) : decodeURIComponent(pathname.split("/").pop() ?? "");
     } catch {
       key = "";
     }
@@ -302,7 +319,9 @@ function pickAssetKey(asset, contentType, used) {
     const ext = dot > 0 ? candidate.slice(dot) : "";
     return `${stem}-${crypto.randomUUID().slice(0, 8)}${ext}`;
   };
-  const finalKey = unique(key || `asset-${crypto.randomUUID().replaceAll("-", "")}.${extension}`);
+  const folder = folderFromCategory(asset.category);
+  const generated = folder ? `${folder}/asset-${crypto.randomUUID().replaceAll("-", "")}.${extension}` : `asset-${crypto.randomUUID().replaceAll("-", "")}.${extension}`;
+  const finalKey = unique(key || generated);
   used.add(finalKey);
   return finalKey;
 }
@@ -600,6 +619,10 @@ async function uploadRemoteAsset(options, remote, key, bytes, contentType) {
   if (response.status === 404 || response.status === 405) {
     const form = new FormData();
     form.append("file", new Blob([bytes], { type: contentType }), key);
+    const folder = key.split("/")[0];
+    if (folder === "icons" || folder === "wallpapers" || folder === "avatars") {
+      form.append("category", folder);
+    }
     const fallback = await remoteFetch(
       options,
       `${remote.base}/api/assets`,
@@ -854,6 +877,11 @@ async function performSync(config, input, options = {}) {
     }
   }
   const remoteInfo = remoteSummary(remote.health);
+  const localInfo = {
+    runtime: config.runtime ?? null,
+    storage: config.state?.kind ?? null,
+    assets: config.assets?.kind ?? null
+  };
   const localUpdatedAt = localState?.updatedAt ?? null;
   const remoteUpdatedAt = remoteState?.updatedAt ?? null;
   if (action === "test") {
@@ -865,6 +893,7 @@ async function performSync(config, input, options = {}) {
       localUpdatedAt,
       remoteUpdatedAt,
       updatedAt: null,
+      local: localInfo,
       remote: remoteInfo,
       empty: remoteState === null
     };
@@ -902,6 +931,7 @@ async function performSync(config, input, options = {}) {
       localUpdatedAt,
       remoteUpdatedAt,
       updatedAt: null,
+      local: localInfo,
       remote: remoteInfo,
       warnings: ["\u4E24\u7AEF\u5BFC\u822A\u5185\u5BB9\u5DF2\u7ECF\u4E00\u81F4\uFF0C\u6CA1\u6709\u4F20\u8F93\u6570\u636E\u3002"]
     };
@@ -928,6 +958,7 @@ async function performSync(config, input, options = {}) {
       localUpdatedAt,
       remoteUpdatedAt,
       updatedAt: updatedAt2,
+      local: localInfo,
       remote: remoteInfo,
       assets: assets2,
       warnings: assets2.warnings
@@ -966,6 +997,7 @@ async function performSync(config, input, options = {}) {
     localUpdatedAt: updatedAt,
     remoteUpdatedAt,
     updatedAt,
+    local: localInfo,
     remote: remoteInfo,
     assets,
     warnings: assets.warnings,
@@ -987,6 +1019,22 @@ var ALLOWED_IMAGE_TYPES = /* @__PURE__ */ new Map([
   ["image/x-icon", "ico"],
   ["image/vnd.microsoft.icon", "ico"]
 ]);
+var ASSET_FOLDERS = {
+  icon: "icons",
+  icons: "icons",
+  wallpaper: "wallpapers",
+  wallpapers: "wallpapers",
+  avatar: "avatars",
+  avatars: "avatars"
+};
+function parseAssetFolder(value) {
+  if (typeof value !== "string") return null;
+  const folder = ASSET_FOLDERS[value.trim().toLowerCase()];
+  return folder ?? null;
+}
+function newAssetKey(extension, folder) {
+  return `${folder}/asset-${crypto.randomUUID().replaceAll("-", "")}.${extension}`;
+}
 var encoder = new TextEncoder();
 async function readBytesLimited(request, maxBytes) {
   const declared = Number(request.headers.get("content-length") || "0");
@@ -1544,7 +1592,15 @@ async function handleAssets(request, config, url) {
     if (file.size > max) {
       return json(413, { error: "too_large", message: `\u56FE\u7247\u4E0D\u80FD\u8D85\u8FC7 ${Math.round(max / 1024 / 1024)} MB` });
     }
-    const key2 = `asset-${crypto.randomUUID().replaceAll("-", "")}.${extension}`;
+    const rawCategory = form.get("category") ?? form.get("folder");
+    const folder = rawCategory == null || rawCategory === "" ? "icons" : parseAssetFolder(rawCategory);
+    if (!folder) {
+      return json(400, {
+        error: "bad_category",
+        message: "\u56FE\u7247\u5206\u7C7B\u53EA\u80FD\u662F icon\u3001wallpaper \u6216 avatar"
+      });
+    }
+    const key2 = newAssetKey(extension, folder);
     const bytes = new Uint8Array(await file.arrayBuffer());
     try {
       const stored = await config.assets.putAsset(key2, bytes, contentType);

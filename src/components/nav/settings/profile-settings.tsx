@@ -50,12 +50,12 @@ export function ProfileSettingsPanel() {
     if (!files?.length) return
     setUploadingAvatar(true)
     try {
-      const assets = await filesToGalleryAssets([files[0]], 'icon')
+      const assets = await filesToGalleryAssets([files[0]], 'avatar')
       const created = addGalleryAssets(assets)
       if (created[0]) {
         updateConfig({ adminAvatar: `gallery:${created[0].id}` })
         setAvatarUrl('')
-        toast.success('头像已更新并加入图库')
+        toast.success('头像已更新')
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '头像上传失败')
@@ -122,7 +122,7 @@ export function ProfileSettingsPanel() {
               onChange={(event) => void uploadAvatar(event.target.files)}
             />
             <p className="max-w-40 text-center text-[10px] leading-relaxed text-muted-foreground">
-              建议使用正方形图片，上传后会自动压缩并保存到图库。
+              建议使用正方形图片，上传后会自动压缩并保存到头像目录。
             </p>
           </div>
 

@@ -164,7 +164,7 @@ await test('asset upload, serving and delete use the Blob namespace', async () =
   })
   const asset = await upload.json()
   assert.equal(upload.status, 201)
-  assert.match(asset.key, /^asset-[a-f0-9]+\.webp$/)
+  assert.match(asset.key, /^icons\/asset-[a-f0-9]+\.webp$/)
   assert.equal(asset.url, `/api/assets/${encodeURIComponent(asset.key)}`)
   assert.ok(store.objects.has(`assets/${asset.key}`))
 

@@ -438,7 +438,7 @@ await test('image upload requires auth and returns a public URL', async () => {
   })
   const uploaded = await upload.json()
   assert.equal(upload.status, 201)
-  assert.match(uploaded.key, /^asset-[a-f0-9]+\.png$/)
+  assert.match(uploaded.key, /^icons\/asset-[a-f0-9]+\.png$/)
   assert.equal(uploaded.url, `/api/assets/${uploaded.key}`)
   assert.equal(uploaded.size, bytes.length)
 
@@ -468,6 +468,49 @@ await test('image upload rejects unsupported types', async () => {
     body: form,
   })
   assert.equal(response.status, 415)
+})
+
+await test('image upload stores icons, wallpapers and avatars in separate folders', async () => {
+  const config = makeConfig()
+  const { body: auth } = await login(config, 'test-password', '10.0.0.21')
+  const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
+
+  async function upload(category) {
+    const form = new FormData()
+    form.append('file', new Blob([bytes], { type: 'image/png' }), `${category}.png`)
+    form.append('category', category)
+    const response = await call(config, '/api/assets', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${auth.token}` },
+      body: form,
+    })
+    return { response, body: await response.json() }
+  }
+
+  const icon = await upload('icon')
+  const wallpaper = await upload('wallpaper')
+  const avatar = await upload('avatar')
+  assert.equal(icon.response.status, 201)
+  assert.equal(wallpaper.response.status, 201)
+  assert.equal(avatar.response.status, 201)
+  assert.match(icon.body.key, /^icons\/asset-[a-f0-9]+\.png$/)
+  assert.match(wallpaper.body.key, /^wallpapers\/asset-[a-f0-9]+\.png$/)
+  assert.match(avatar.body.key, /^avatars\/asset-[a-f0-9]+\.png$/)
+
+  const served = await call(config, wallpaper.body.url)
+  assert.equal(served.status, 200)
+  assert.deepEqual(new Uint8Array(await served.arrayBuffer()), bytes)
+
+  const invalid = new FormData()
+  invalid.append('file', new Blob([bytes], { type: 'image/png' }), 'x.png')
+  invalid.append('category', '../secret')
+  const rejected = await call(config, '/api/assets', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${auth.token}` },
+    body: invalid,
+  })
+  assert.equal(rejected.status, 400)
+  assert.equal((await rejected.json()).error, 'bad_category')
 })
 
 await test('login is rate limited per IP', async () => {

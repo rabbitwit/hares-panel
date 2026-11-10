@@ -3,7 +3,8 @@ export type GroupStyle = CardStyle | 'inherit'
 export type OpenMode = 'new' | 'self'
 export type NetworkMode = 'auto' | 'internal' | 'external'
 export type Appearance = 'dark' | 'light'
-export type WallpaperCategory = 'icon' | 'wallpaper'
+export type AssetCategory = 'icon' | 'wallpaper' | 'avatar'
+export type WallpaperCategory = Extract<AssetCategory, 'icon' | 'wallpaper'>
 
 export interface NavItem {
   id: string
@@ -45,7 +46,7 @@ export interface SearchEngine {
 export interface GalleryAsset {
   id: string
   name: string
-  category: WallpaperCategory
+  category: AssetCategory
   /** Public URL in R2 / KV / Vercel Blob / Docker file storage. Cloud storage is required in server mode. */
   dataUrl: string
   size: number

@@ -2,9 +2,18 @@
 
 所有值得注意的改动都会记录在此文件。格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，并遵循[语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [0.1.2]
+## [0.1.3]
 
-以下功能已完成开发，尚未推送/发布到线上与镜像仓库。
+### 变更
+
+- 上传的图标、壁纸和个人头像分别保存到 `icons/`、`wallpapers/`、`avatars/` 目录，不再混放在同一层。
+
+### 修复
+
+- 移动端 Chrome 点击卡片会按网址匹配已安装应用并直接唤起（Bilibili / YouTube / GitHub 等），现强制在浏览器内打开。
+
+
+## [0.1.2]
 
 ### 新增
 

@@ -5,6 +5,7 @@ import { useSessionStore } from '@/store/session-store'
 import { useUiStore } from '@/store/ui-store'
 import { useOpenItem } from '@/hooks/use-open-item'
 import { buildSearchUrl } from '@/lib/network'
+import { openExternalUrl } from '@/lib/open-url'
 import { NavIcon } from '@/components/nav/nav-icon'
 import {
   DropdownMenu,
@@ -88,11 +89,7 @@ export function SearchBar() {
     if (!engine) return
     const url = buildSearchUrl(engine.url, query)
     if (!url) return
-    if (config.searchInNewTab) {
-      window.open(url, '_blank', 'noopener,noreferrer')
-    } else {
-      window.location.assign(url)
-    }
+    openExternalUrl(url, config.searchInNewTab ? 'new' : 'self')
   }
 
   const chooseEngine = (id: string) => {

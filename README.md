@@ -218,14 +218,14 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 
 默认演示数据约 10 KB；Cloud 平台应用内上限 8 MB（Docker 默认 16 MB，可通过 `HARES_STATE_MAX_MB` 调整），但实际请求还受平台限制（Vercel 约 4.5 MB、EdgeOne 5 MB）。每次修改覆盖整份文档，`updatedAt` 由服务端生成。
 
-图片上传后进入 R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地 `data/assets/`：
+图片上传后进入 R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地 `data/assets/`，并按类型分到 `icons/`、`wallpapers/`、`avatars/`：
 
 ```json
 {
   "name": "logo",
   "category": "icon",
-  "dataUrl": "/api/assets/asset-xxxx.webp",
-  "remoteKey": "asset-xxxx.webp",
+  "dataUrl": "/api/assets/icons/asset-xxxx.webp",
+  "remoteKey": "icons/asset-xxxx.webp",
   "size": 5288
 }
 ```
@@ -242,7 +242,7 @@ KV / D1 / Redis / EdgeOne Blob / Docker 本地文件中保存的是**一份完�
 | `GET` | `/api/state` | 否 | 公开投影（不含访客隐藏的卡片/分组）；关闭公开访问时返回配置与空内容（`locked`） |
 | `GET` | `/api/state?full=1` | Bearer | 完整数据，仅管理员 |
 | `PUT` | `/api/state` | Bearer | 覆盖保存，Cloud 平台默认上限 8 MB（Docker 默认 16 MB） |
-| `POST` | `/api/assets` | Bearer | `multipart/form-data` 上传图片 |
+| `POST` | `/api/assets` | Bearer | `multipart/form-data` 上传图片（`category` 为 `icon` / `wallpaper` / `avatar`，分别写入对应目录） |
 | `GET` | `/api/assets/:key` | 否 | Worker / R2 / EdgeOne / Docker 回源图片；Vercel Blob 由 CDN 提供 |
 | `DELETE` | `/api/assets/:key` | Bearer | 删除 R2 / KV / Vercel Blob / EdgeOne Blob / Docker 本地对象 |
 

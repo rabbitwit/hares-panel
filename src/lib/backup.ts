@@ -95,7 +95,7 @@ const searchEngineSchema = z.object({
 const galleryAssetSchema = z.object({
   id: z.string().min(1),
   name: z.string().max(240),
-  category: z.enum(['icon', 'wallpaper']),
+  category: z.enum(['icon', 'wallpaper', 'avatar']),
   dataUrl: z.string().min(1).max(30_000_000),
   size: z.number().min(0),
   createdAt: z.number().default(() => Date.now()),

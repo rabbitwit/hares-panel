@@ -1,4 +1,4 @@
-import type { AppData } from '@/types'
+import type { AppData, AssetCategory } from '@/types'
 
 export const CLOUD_API_BASE = '/api'
 
@@ -293,9 +293,11 @@ export async function uploadCloudAsset(
   token: string,
   blob: Blob,
   filename: string,
+  category?: AssetCategory,
 ): Promise<CloudUploadResult> {
   const form = new FormData()
   form.append('file', blob, filename)
+  if (category) form.append('category', category)
   return api<CloudUploadResult>('/assets', {
     method: 'POST',
     headers: { authorization: `Bearer ${token}` },

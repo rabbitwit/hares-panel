@@ -5,7 +5,7 @@
  *
  *   /data/state.json      navigation data written by the admin
  *   /data/sync-meta.json  last cross-instance sync status
- *   /data/assets/*        uploaded images
+ *   /data/assets/icons|wallpapers|avatars/*  uploaded images by category
  *   /data/session-secret  generated once, used to sign login tokens
  *
  * Writes are serialized and committed with a temporary file + rename so a

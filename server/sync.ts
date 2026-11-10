@@ -222,6 +222,22 @@ function safeAssetKey(key: string): string | null {
   return /^[a-zA-Z0-9._/-]+$/.test(key) ? key : null
 }
 
+function folderFromCategory(category?: string): 'icons' | 'wallpapers' | 'avatars' | '' {
+  switch (category?.trim().toLowerCase()) {
+    case 'wallpaper':
+    case 'wallpapers':
+      return 'wallpapers'
+    case 'avatar':
+    case 'avatars':
+      return 'avatars'
+    case 'icon':
+    case 'icons':
+      return 'icons'
+    default:
+      return ''
+  }
+}
+
 function pickAssetKey(
   asset: SyncGalleryAsset,
   contentType: string,
@@ -232,7 +248,12 @@ function pickAssetKey(
   if (!key && asset.dataUrl) {
     try {
       const pathname = new URL(asset.dataUrl, 'https://placeholder.local/').pathname
-      key = decodeURIComponent(pathname.split('/').pop() ?? '')
+      const marker = '/api/assets/'
+      const index = pathname.indexOf(marker)
+      key =
+        index >= 0
+          ? decodeURIComponent(pathname.slice(index + marker.length))
+          : decodeURIComponent(pathname.split('/').pop() ?? '')
     } catch {
       key = ''
     }
@@ -249,7 +270,11 @@ function pickAssetKey(
     return `${stem}-${crypto.randomUUID().slice(0, 8)}${ext}`
   }
 
-  const finalKey = unique(key || `asset-${crypto.randomUUID().replaceAll('-', '')}.${extension}`)
+  const folder = folderFromCategory(asset.category)
+  const generated = folder
+    ? `${folder}/asset-${crypto.randomUUID().replaceAll('-', '')}.${extension}`
+    : `asset-${crypto.randomUUID().replaceAll('-', '')}.${extension}`
+  const finalKey = unique(key || generated)
   used.add(finalKey)
   return finalKey
 }
@@ -625,6 +650,10 @@ async function uploadRemoteAsset(
     // multipart upload API. The generated key may differ, which is fine.
     const form = new FormData()
     form.append('file', new Blob([bytes], { type: contentType }), key)
+    const folder = key.split('/')[0]
+    if (folder === 'icons' || folder === 'wallpapers' || folder === 'avatars') {
+      form.append('category', folder)
+    }
     const fallback = await remoteFetch(
       options,
       `${remote.base}/api/assets`,

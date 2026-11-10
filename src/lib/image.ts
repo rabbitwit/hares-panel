@@ -1,7 +1,7 @@
 import { formatBytes } from '@/lib/utils'
 import { dataUrlToBlob, deleteCloudAsset, uploadCloudAsset } from '@/lib/cloud'
 import { useCloudStore } from '@/store/cloud-store'
-import type { GalleryAsset, WallpaperCategory } from '@/types'
+import type { AssetCategory, GalleryAsset } from '@/types'
 
 const MAX_SOURCE_SIZE = 20 * 1024 * 1024
 const ICON_MAX = 512
@@ -33,7 +33,7 @@ function loadImageElement(source: string): Promise<HTMLImageElement> {
   })
 }
 
-export async function processImage(file: File, category: WallpaperCategory): Promise<ProcessedImage> {
+export async function processImage(file: File, category: AssetCategory): Promise<ProcessedImage> {
   if (!file.type.startsWith('image/')) {
     throw new Error('请选择图片文件')
   }
@@ -54,7 +54,7 @@ export async function processImage(file: File, category: WallpaperCategory): Pro
   }
 
   const element = await loadImageElement(original)
-  const max = category === 'icon' ? ICON_MAX : WALLPAPER_MAX
+  const max = category === 'wallpaper' ? WALLPAPER_MAX : ICON_MAX
   const scale = Math.min(1, max / Math.max(element.naturalWidth, element.naturalHeight))
   const width = Math.max(1, Math.round(element.naturalWidth * scale))
   const height = Math.max(1, Math.round(element.naturalHeight * scale))
@@ -66,7 +66,7 @@ export async function processImage(file: File, category: WallpaperCategory): Pro
   context.imageSmoothingQuality = 'high'
   context.drawImage(element, 0, 0, width, height)
 
-  const webp = canvas.toDataURL('image/webp', category === 'icon' ? 0.9 : 0.86)
+  const webp = canvas.toDataURL('image/webp', category === 'wallpaper' ? 0.86 : 0.9)
   const mime = webp.startsWith('data:image/webp') ? 'image/webp' : 'image/png'
   const dataUrl = mime === 'image/webp' ? webp : canvas.toDataURL('image/png')
 
@@ -89,7 +89,7 @@ export function dataUrlSize(dataUrl: string) {
 
 export async function filesToGalleryAssets(
   files: File[],
-  category: WallpaperCategory,
+  category: AssetCategory,
 ): Promise<Omit<GalleryAsset, 'id' | 'createdAt'>[]> {
   const cloud = useCloudStore.getState()
   if (cloud.status !== 'connected' || !cloud.info?.assets || !cloud.token) {
@@ -108,6 +108,7 @@ export async function filesToGalleryAssets(
         token,
         blob,
         `${name}.${processed.mime.split('/')[1] || 'webp'}`,
+        category,
       )
       uploadedKeys.push(uploaded.key)
       assets.push({

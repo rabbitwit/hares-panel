@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store/app-store'
 import { resolveItemUrl } from '@/lib/network'
+import { openExternalUrl } from '@/lib/open-url'
 import { normalizeUrl } from '@/lib/utils'
 import type { NavItem, OpenMode } from '@/types'
 
@@ -17,25 +18,9 @@ export function useOpenItem() {
       return
     }
 
-    if (mode === 'self') {
-      window.location.assign(url)
-      return
-    }
-
-    // `noopener` makes window.open() return null even on success, so open a
-    // blank tab first to detect a real popup blocker, then navigate it.
-    const opened = window.open('about:blank', '_blank')
-    if (!opened) {
+    if (openExternalUrl(url, mode === 'self' ? 'self' : 'new') === 'blocked') {
       toast.error('新窗口被浏览器拦截，请允许弹出窗口')
-      return
     }
-    try {
-      opened.opener = null
-    } catch {
-      // Cross-origin restrictions can make the opener read-only; navigation
-      // below is still safe because the new window starts on about:blank.
-    }
-    opened.location.replace(url)
   }, [])
 
   const openItem = useCallback(

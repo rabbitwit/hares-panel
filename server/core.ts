@@ -87,6 +87,27 @@ const ALLOWED_IMAGE_TYPES = new Map<string, string>([
   ['image/vnd.microsoft.icon', 'ico'],
 ])
 
+const ASSET_FOLDERS = {
+  icon: 'icons',
+  icons: 'icons',
+  wallpaper: 'wallpapers',
+  wallpapers: 'wallpapers',
+  avatar: 'avatars',
+  avatars: 'avatars',
+} as const
+
+type AssetFolder = (typeof ASSET_FOLDERS)[keyof typeof ASSET_FOLDERS]
+
+function parseAssetFolder(value: unknown): AssetFolder | null {
+  if (typeof value !== 'string') return null
+  const folder = ASSET_FOLDERS[value.trim().toLowerCase() as keyof typeof ASSET_FOLDERS]
+  return folder ?? null
+}
+
+function newAssetKey(extension: string, folder: AssetFolder): string {
+  return `${folder}/asset-${crypto.randomUUID().replaceAll('-', '')}.${extension}`
+}
+
 const encoder = new TextEncoder()
 
 async function readBytesLimited(
@@ -776,7 +797,18 @@ async function handleAssets(request: Request, config: ApiConfig, url: URL): Prom
     if (file.size > max) {
       return json(413, { error: 'too_large', message: `图片不能超过 ${Math.round(max / 1024 / 1024)} MB` })
     }
-    const key = `asset-${crypto.randomUUID().replaceAll('-', '')}.${extension}`
+    const rawCategory = form.get('category') ?? form.get('folder')
+    const folder =
+      rawCategory == null || rawCategory === ''
+        ? 'icons'
+        : parseAssetFolder(rawCategory)
+    if (!folder) {
+      return json(400, {
+        error: 'bad_category',
+        message: '图片分类只能是 icon、wallpaper 或 avatar',
+      })
+    }
+    const key = newAssetKey(extension, folder)
     const bytes = new Uint8Array(await file.arrayBuffer())
     try {
       const stored = await config.assets.putAsset(key, bytes, contentType)
