@@ -263,7 +263,9 @@ export function ItemCard({
           ? 'nav-card-glass is-card-glass-on-hover'
           : 'border-transparent hover:border-foreground/10 hover:bg-foreground/7',
       ),
-    editMode && 'ring-1 ring-foreground/10 ring-offset-0 hover:ring-foreground/25',
+    editMode &&
+      style !== 'icon' &&
+      'ring-1 ring-foreground/10 ring-offset-0 hover:ring-foreground/25',
     item.hidden && !isAdmin && 'hidden',
     className,
   )
@@ -304,7 +306,7 @@ export function ItemCard({
           <button
             type="button"
             aria-label="拖动排序"
-            className="drag-handle absolute -left-1 -top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-foreground/15 bg-background/90 text-foreground/55 opacity-100 shadow-lg backdrop-blur transition-opacity focus-visible:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100"
+            className="drag-handle absolute left-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-foreground/15 bg-background/90 text-foreground/55 opacity-100 shadow-lg backdrop-blur transition-opacity focus-visible:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100"
             onClick={(event) => event.stopPropagation()}
             {...dragHandleProps}
           >
@@ -313,7 +315,7 @@ export function ItemCard({
           <button
             type="button"
             aria-label="编辑卡片"
-            className="absolute -right-1 -top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-foreground/15 bg-background/90 text-foreground/70 opacity-100 shadow-lg backdrop-blur transition-opacity focus-visible:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100"
+            className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-foreground/15 bg-background/90 text-foreground/70 opacity-100 shadow-lg backdrop-blur transition-opacity focus-visible:opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100"
             onClick={(event) => {
               event.stopPropagation()
               openEditItem(item.id)
